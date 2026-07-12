@@ -470,22 +470,53 @@ function sn2Mechanism(progress) {
   g.scale.setScalar(.9); g.rotation.set(.08, -.28, -.04); return g;
 }
 
+// A bond that knows its own bond order. A full bond is a solid stick; a PARTIAL bond - one
+// being made or broken in a transition state - is drawn dashed, which is the convention
+// chemists actually use. The two crossfade, so a forming bond goes dashed -> solid smoothly.
+const BOND_DASHES = 4;
 function animatedMechanismBond(group, color = 0x64706d, radius = .04, part) {
   const mesh = new THREE.Mesh(new THREE.CylinderGeometry(radius, radius, 1, 14), material(color, { transparent: true, opacity: 0, roughness: .3 }));
   mesh.visible = false;
   if (part) tag(mesh, part);
   group.add(mesh);
+  const dashes = [];
+  for (let i = 0; i < BOND_DASHES; i += 1) {
+    const d = new THREE.Mesh(new THREE.CylinderGeometry(radius * .82, radius * .82, 1, 10), material(color, { transparent: true, opacity: 0, roughness: .3 }));
+    d.visible = false;
+    if (part) tag(d, part);
+    group.add(d);
+    dashes.push(d);
+  }
+  const UP = new THREE.Vector3(0, 1, 0);
   return (from, to, order = 1) => {
     const direction = to.clone().sub(from);
     const length = direction.length();
-    mesh.visible = order > .015 && length > .001;
-    if (!mesh.visible) return;
-    mesh.position.copy(from).add(to).multiplyScalar(.5);
-    // radius tracks bond order: a partial bond is visibly thin, a full bond is solid
-    const r = .26 + .74 * Math.min(1, order);
-    mesh.scale.set(r, length, r);
-    mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), direction.normalize());
-    mesh.material.opacity = Math.min(1, .35 + order * .65);
+    if (!(length > .001) || order <= .04) {
+      mesh.visible = false;
+      dashes.forEach((d) => { d.visible = false; });
+      return;
+    }
+    const unit = direction.clone().normalize();
+    const quat = new THREE.Quaternion().setFromUnitVectors(UP, unit);
+    // solid takes over as the bond completes; dashes carry the partial region
+    const solid = THREE.MathUtils.smoothstep(order, .74, .96);
+    const dashed = (1 - solid) * THREE.MathUtils.smoothstep(order, .05, .18);
+    mesh.visible = solid > .02;
+    if (mesh.visible) {
+      mesh.position.copy(from).add(to).multiplyScalar(.5);
+      mesh.scale.set(1, length, 1);
+      mesh.quaternion.copy(quat);
+      mesh.material.opacity = solid;
+    }
+    const seg = length / (BOND_DASHES * 2 - 1);   // dash, gap, dash, gap, dash...
+    dashes.forEach((d, i) => {
+      d.visible = dashed > .02;
+      if (!d.visible) return;
+      d.position.copy(from).addScaledVector(unit, (i * 2 + .5) * seg);
+      d.scale.set(1, seg, 1);
+      d.quaternion.copy(quat);
+      d.material.opacity = dashed;
+    });
   };
 }
 
