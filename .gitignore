@@ -1,0 +1,14 @@
+node_modules/
+dist/
+artifacts/
+.claude/
+.impeccable.md
+*.log
+.DS_Store
+
+# machine-specific dev QA scripts (hardcoded local paths, write to artifacts/)
+scripts/check-receptor.mjs
+scripts/check-selection.mjs
+scripts/check-slider.mjs
+scripts/check-targets.mjs
+scripts/visual-check.mjs

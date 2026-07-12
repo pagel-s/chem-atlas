@@ -1,0 +1,26 @@
+{
+  "name": "chem-atlas",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "check:science": "node scripts/check-science.mjs",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@vitejs/plugin-react": "latest",
+    "3dmol": "^2.5.5",
+    "lucide-react": "latest",
+    "ngl": "^2.4.0",
+    "react": "latest",
+    "react-dom": "latest",
+    "three": "latest",
+    "typescript": "latest",
+    "vite": "latest"
+  },
+  "devDependencies": {
+    "playwright": "^1.61.1"
+  }
+}
