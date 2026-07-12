@@ -1956,7 +1956,7 @@ function catalystExhibit(progress) {
   mouthRing.rotation.z = Math.PI / 6;
   mouthRing.position.set(selectedChannelCenter.x, selectedChannelCenter.y, .014);
   tag(mouthRing, 'Selected channel wall'); monolith.add(mouthRing);
-  const monolithL = labelSprite('the marked channel', '#e0c07a', .3);
+  const monolithL = labelSprite('the marked channel · ~1 mm across', '#e0c07a', .3);
   monolithL.position.set(0, 1.12, .05); tag(monolithL, 'Selected channel wall'); monolith.add(monolithL); monolithL.visible = true;
 
   // An irregular extruded oxide patch with real holes conveys porous washcoat
@@ -1978,7 +1978,7 @@ function catalystExhibit(progress) {
     new THREE.LineBasicMaterial({ color: 0xc3a76c, transparent: true, opacity: .9, depthWrite: false }),
   );
   tag(washcoatOutline, 'Washcoat'); washcoat.add(washcoatOutline);
-  const washcoatL = labelSprite('porous washcoat on that wall · µm', '#e0c07a', .15);
+  const washcoatL = labelSprite('porous washcoat on that wall · ~30 µm thick', '#e0c07a', .15);
   washcoatL.position.set(-.28, .21, .12); tag(washcoatL, 'Washcoat'); washcoat.add(washcoatL); washcoatL.visible = true;
   [[-.32,.24], [.08,-.29]].forEach(([x, y]) => {
     [[0,0],[.055,.012],[-.018,.05]].forEach(([dx, dy], index) => atom(washcoat, [x + dx, y + dy, .065 + index * .005], .028, index === 1 ? 0xe2e7e4 : 0xc3cece, 'Metal site', { ...pt, transparent: true, opacity: .42 }));
@@ -1996,11 +1996,9 @@ function catalystExhibit(progress) {
   addHexLayer(selectedParticle, 3, .0, [0,0], 0x677274, .013, .045, 'Selected Pt nanoparticle');
   addHexLayer(selectedParticle, 3, .029, [.022,.013], 0x98a1a1, .014, .045, 'Selected Pt nanoparticle');
   addHexLayer(selectedParticle, 2, .061, [0,0], 0xe2e7e4, .015, .045, 'Pt(111) terrace');
-  const particleHalo = new THREE.Mesh(new THREE.RingGeometry(.17, .2, 6), material(0xc3a76c, { transparent: true, opacity: .92, emissive: 0x7b5718, emissiveIntensity: .22, side: THREE.DoubleSide, depthWrite: false }));
+  const particleHalo = new THREE.Mesh(new THREE.RingGeometry(.17, .196, 48), material(0xc3a76c, { transparent: true, opacity: .92, emissive: 0x7b5718, emissiveIntensity: .22, side: THREE.DoubleSide, depthWrite: false }));
   particleHalo.position.z = .078; tag(particleHalo, 'Selected Pt nanoparticle'); selectedParticle.add(particleHalo);
-  const particleFacetHalo = new THREE.Mesh(new THREE.RingGeometry(.1, .124, 6), material(0xc3a76c, { transparent: true, opacity: .78, emissive: 0x7b5718, emissiveIntensity: .18, side: THREE.DoubleSide, depthWrite: false }));
-  particleFacetHalo.position.z = .079; tag(particleFacetHalo, 'Pt(111) terrace'); selectedParticle.add(particleFacetHalo);
-  const particleL = labelSprite('one Pt nanoparticle · nm', '#e0c07a', .14);
+  const particleL = labelSprite('one Pt nanoparticle · ~3 nm', '#e0c07a', .14);
   particleL.position.set(0, .3, .1); tag(particleL, 'Selected Pt nanoparticle'); selectedParticle.add(particleL); particleL.visible = true;
   // The washcoat and its particle remain attached to the marked inner wall.
   // The camera, rather than the particle, pivots to the facet inspection view.
@@ -2014,13 +2012,11 @@ function catalystExhibit(progress) {
   addHexLayer(surfaceLattice, 3, .06, [0,0], 0x657174, .04, .14, 'Selected Pt nanoparticle');
   addHexLayer(surfaceLattice, 3, .15, [.07,.04], 0x939d9d, .043, .14, 'Selected Pt nanoparticle');
   addHexLayer(surfaceLattice, 2, .25, [0,0], 0xd8dfda, .047, .14, 'Pt(111) terrace');
-  const facetPoints = Array.from({ length: 6 }, (_, index) => {
-    const angle = index * Math.PI / 3 + Math.PI / 6;
-    return new THREE.Vector3(Math.cos(angle) * .34, Math.sin(angle) * .34, .325);
-  });
-  const facetOutline = new THREE.LineLoop(new THREE.BufferGeometry().setFromPoints(facetPoints), new THREE.LineBasicMaterial({ color: 0xc3a76c, transparent: true, opacity: .9, depthWrite: false }));
-  tag(facetOutline, 'Pt(111) terrace'); particleContext.add(facetOutline);
-  const terraceL = labelSprite('its top facet: Pt(111) terrace · atomic', '#e0c07a', .13);
+  const particleRing = new THREE.Mesh(new THREE.RingGeometry(.575, .586, 64), material(0xc3a76c, {
+    transparent: true, opacity: .5, emissive: 0x7b5718, emissiveIntensity: .3, side: THREE.DoubleSide, depthWrite: false,
+  }));
+  particleRing.position.z = .16; tag(particleRing, 'Selected Pt nanoparticle'); particleContext.add(particleRing);
+  const terraceL = labelSprite('top facet of that same particle · Pt–Pt = 0.28 nm', '#e0c07a', .12);
   terraceL.position.set(-.59, .13, .36); tag(terraceL, 'Pt(111) terrace'); particleContext.add(terraceL); terraceL.visible = true;
 
   const setGroupOpacity = (group, opacity) => {
