@@ -307,13 +307,16 @@ export const techniqueSpecs = [
     summary: 'Knock an electron out of ethanol and it falls apart. Where it breaks is not random: it breaks to leave the most stabilised cation, and that is what makes m/z 31 the base peak.',
     evidence: 'Ethanol, electron ionisation at 70 eV. Approximate relative intensities (NIST): m/z 31 = 100 (base), 45 = 42, 29 = 26, 27 = 22, 46 (M+.) = 23, 15 = 8. Minor fragments are omitted. The instrument is drawn as a scanning mass filter; the ion source, acceleration optics and vacuum are not shown.',
     control: ['m/z 0', 'm/z 60'],
-    legend: ['molecular ion M⁺•', 'α-cleavage', 'oxocarbenium CH₂=OH⁺', 'detector'],
+    legend: ['e⁻ 70 eV ionises → M⁺•', 'α-cleavage', 'the ION is accelerated', 'the NEUTRAL is lost'],
     parts: {
       'Molecular ion': 'Ethanol minus ONE electron: a radical cation, M⁺• at m/z 46. It is odd-electron and unstable, which is why it is not the tallest peak — only about 23% of the base peak.',
       'Alpha cleavage': 'The C–C bond next to the oxygen breaks. This is the dominant fragmentation of alcohols, and it happens because of what it leaves behind.',
       Oxocarbenium: 'CH₂=OH⁺ at m/z 31. The oxygen donates a lone pair into the empty carbon orbital, forming a full C=O π bond that spreads the positive charge over two atoms. That stabilisation is why this fragment dominates the spectrum.',
       'Methyl fragment': 'CH₃⁺ at m/z 15. A primary carbocation with nothing to stabilise it — which is exactly why it is a tiny peak (8%).',
-      Detector: 'Only ions of the selected mass-to-charge ratio get through the filter and are counted.',
+      'Neutral fragment': 'THE thing most people miss about mass spectrometry: when the molecule breaks, only ONE piece keeps the charge. The other leaves as a neutral radical, and a mass spectrometer cannot accelerate, deflect or detect a neutral. It is lost. Every peak you see is an ion; every fragmentation also produced something you never saw.',
+      Ionisation: 'A 70 eV electron does not stick to the molecule - it knocks one electron OUT, leaving a radical cation M+. with both an unpaired electron and a positive charge.',
+      Analyser: 'Ions are accelerated down the flight tube. Which one reaches the detector depends on its mass-to-charge ratio, and that is what the sweep selects.',
+      Detector: 'Only ions of the selected mass-to-charge ratio get through and are counted.',
     },
     steps: [
       ['Ionise: knock out one electron', 'A 70 eV electron does not add charge — it removes an electron, leaving a radical cation M⁺• at m/z 46. Its mass gives you the molecular mass straight away.'],

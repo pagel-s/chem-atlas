@@ -935,6 +935,37 @@ function tripodH(center, outward, len) {
   });
 }
 
+// A bond that renders its ORDER honestly: ONE centred stick for a single bond, TWO parallel
+// sticks symmetric about the axis for a double bond. (The old version drew a centre line plus
+// one offset line, which is why double bonds looked lopsided.) Partial orders come out dashed,
+// and the two representations crossfade as the order changes.
+function orderBond(group, color, radius, part) {
+  const single = animatedMechanismBond(group, color, radius, part);
+  const upper = animatedMechanismBond(group, color, radius * .8, part);
+  const lower = animatedMechanismBond(group, color, radius * .8, part);
+  return (from, to, order = 1) => {
+    const dbl = THREE.MathUtils.clamp(order - 1, 0, 1);
+    const sgl = THREE.MathUtils.clamp(order, 0, 1) * (1 - dbl);
+    single(from, to, sgl);
+    const off = piOffset(from, to, radius * 2.2);
+    upper(from.clone().add(off), to.clone().add(off), dbl);
+    lower(from.clone().sub(off), to.clone().sub(off), dbl);
+  };
+}
+
+// A bent centre (water, hydroxide, an alcohol oxygen). Given the oxygen and the direction of
+// its FIRST bond, place the second substituent at the real angle. This is what makes the
+// geometry respond when a new bond forms: grab a proton and the H-O-H angle follows it.
+function bentSecond(origin, dir1, len, angleDeg = 104.5, roll = 0) {
+  const a = dir1.clone().normalize();
+  let perp = new THREE.Vector3().crossVectors(a, new THREE.Vector3(0, 0, 1));
+  if (perp.lengthSq() < .0015) perp = new THREE.Vector3().crossVectors(a, new THREE.Vector3(0, 1, 0));
+  perp.normalize().applyAxisAngle(a, roll);
+  const th = angleDeg * Math.PI / 180;
+  const d2 = a.clone().multiplyScalar(Math.cos(th)).addScaledVector(perp, Math.sin(th)).normalize();
+  return origin.clone().addScaledVector(d2, len);
+}
+
 // The other two bonds of a TRIGONAL (sp2) centre: 120 deg from the known one, in its plane.
 function sp2Others(dir, normal) {
   const d = dir.clone().normalize();
@@ -1013,8 +1044,7 @@ function e2Mechanism(progress) {
   const bCA2 = animatedMechanismBond(g, 0x68716e, .052, 'Electrophile');
   const bCB2 = animatedMechanismBond(g, 0x68716e, .052, 'Electrophile');
   const bCB3 = animatedMechanismBond(g, 0x68716e, .052, 'Electrophile');
-  const ccSigma = animatedMechanismBond(g, 0x69736f, .066, 'Electrophile');
-  const ccPi = animatedMechanismBond(g, 0x67a85f, .05, 'Transition state');
+  const ccBond = orderBond(g, 0x69736f, .062, 'Electrophile');   // C-C -> C=C
   const cbH = animatedMechanismBond(g, 0x69716e, .052, 'Transition state');
   const cBrBond = animatedMechanismBond(g, 0x69736f, .06, 'Leaving group');
   const obH = animatedMechanismBond(g, 0x69716e, .052, 'Nucleophile');
@@ -1042,18 +1072,19 @@ function e2Mechanism(progress) {
     bCA1(cA, pA1, 1); bCA2(cA, pA2, 1); bCB2(cB, pB2, 1); bCB3(cB, pB3, 1);
     const oPos = V(-2.25, 1.5, 0).lerp(V(-1.45, 1.22, 0), approach);
     baseO.position.copy(oPos);
-    const bhPos = oPos.clone().add(V(-.28, .34, .1)); baseH.position.copy(bhPos); obaseH(oPos, bhPos, 1);
+    // placeholder; the hydroxide H is positioned after the beta-H, see below
     const hBstart = cBr0.clone().add(hBd.clone().multiplyScalar(LCH));
     const bH = hBstart.clone().lerp(oPos.clone().add(V(.42, -.3, 0)), hTransfer);
     betaH.position.copy(bH);
+    // the hydroxide's own H now answers to the proton being captured: H-O-H opens to 104.5 deg
+    const bhPos = bentSecond(oPos, bH.clone().sub(oPos), .82, 104.5, 0);
+    baseH.position.copy(bhPos); obaseH(oPos, bhPos, 1);
     cbH(cB, bH, 1 - THREE.MathUtils.smoothstep(value, .3, .68));
     obH(oPos, bH, THREE.MathUtils.smoothstep(value, .42, .82));
     const brStart = cAr.clone().add(brd.clone().multiplyScalar(LCBR));
     brm.position.copy(brStart.clone().lerp(V(2.15, -1.5, 0), depart));
     cBrBond(cA, brm.position, 1 - THREE.MathUtils.smoothstep(value, .38, .74));
-    ccSigma(cA, cB, 1);
-    const off = piOffset(cA, cB, .15);
-    ccPi(cA.clone().add(off), cB.clone().add(off), planar);
+    ccBond(cA, cB, 1 + planar);   // single -> double as the alkene forms
     const op = THREE.MathUtils.smoothstep(value, .16, .3) * (1 - THREE.MathUtils.smoothstep(value, .6, .76));
     arrowBase([oPos.clone().add(V(.2, -.05, .2)), oPos.clone().lerp(bH, .5).add(V(.1, .2, .2)), bH.clone().add(V(-.02, .16, .15))], op);
     arrowPi([bH.clone().lerp(cB, .5).add(V(.1, .05, .24)), cA.clone().lerp(cB, .5).add(V(0, .4, .26)), cA.clone().lerp(cB, .5).add(V(0, .14, .2))], op);
@@ -1105,7 +1136,21 @@ function sn1Mechanism(progress) {
   const nuOH = animatedMechanismBond(g, 0x69716e, .052, 'Nucleophile');
   const arrowIonize = mechanismElectronArrow(g, 'Leaving group');
   const arrowCapture = mechanismElectronArrow(g, 'Nucleophile');
-  const catCharge = labelSprite('planar carbocation C+', '#ffd36b', .42); catCharge.position.set(0, 1.55, 0); g.add(catCharge);
+  const catCharge = labelSprite('planar carbocation C⁺ · empty p orbital', '#ffd36b', .66); catCharge.position.set(-.75, 1.95, 0); g.add(catCharge);
+  // the vacant p orbital: two lobes normal to the (yz) plane of the three methyls
+  const pLobes = [1, -1].map((sign) => {
+    const lobe = new THREE.Mesh(new THREE.SphereGeometry(1, 24, 16), material(0x9c7fc4, {
+      transparent: true, opacity: 0, side: THREE.DoubleSide, depthWrite: false, emissive: 0x53307a, emissiveIntensity: .18,
+    }));
+    lobe.scale.set(.62, .42, .42);
+    lobe.position.set(sign * .62, 0, 0);
+    tag(lobe, 'Electrophile'); g.add(lobe);
+    return lobe;
+  });
+  const faceA = mechanismElectronArrow(g, 'Nucleophile');
+  const faceB = mechanismElectronArrow(g, 'Nucleophile');
+  const faceLabel = labelSprite('either face is open → racemic product', '#c7a8e0', .84);
+  faceLabel.position.set(0, -1.85, 0); g.add(faceLabel);
   const brCharge = labelSprite('Br⁻', '#ffd36b', .2); brm.add(brCharge); brCharge.position.set(0, -.52, 0);
   const nuCharge = labelSprite('Nu- (OH-)', '#ffd36b', .28); nu.add(nuCharge); nuCharge.position.set(0, -.45, 0);
   const setMarker = mechanismEnergyTrack(g, 'Transition state', (t) => -t * .3 + .95 * Math.exp(-Math.pow((t - .27) / .12, 2)) + .6 * Math.exp(-Math.pow((t - .72) / .12, 2)) + .34 * Math.exp(-Math.pow((t - .5) / .16, 2)) + .12);
@@ -1123,13 +1168,23 @@ function sn1Mechanism(progress) {
     brm.position.copy(V(-LCBR, 0, 0).lerp(V(-2.7, 0, 0), THREE.MathUtils.smoothstep(value, .08, .5)));
     cBr(Cc, brm.position, 1 - THREE.MathUtils.smoothstep(value, .1, .45));
     const nuPos = V(2.7, 0, 0).lerp(V(LCO, 0, 0), THREE.MathUtils.smoothstep(value, .55, .95));
-    nu.position.copy(nuPos); nuH.position.copy(nuPos).add(V(.36, .36, 0));
-    nuOH(nuPos, nuH.position, 1);
+    nu.position.copy(nuPos);
+    // the O-H answers to the forming C-O bond: C-O-H opens toward the real ~108 deg
+    const nuHPos = bentSecond(nuPos, Cc.clone().sub(nuPos), .8, 108, Math.PI * .35);
+    nuH.position.copy(nuHPos);
+    nuOH(nuPos, nuHPos, 1);
     cNu(Cc, nuPos, THREE.MathUtils.smoothstep(value, .6, .92));
     const aIon = THREE.MathUtils.smoothstep(value, .05, .16) * (1 - THREE.MathUtils.smoothstep(value, .35, .46));
     arrowIonize([Cc.clone().lerp(brm.position, .5).add(V(0, .18, .25)), brm.position.clone().add(V(.2, .42, .25)), brm.position.clone().add(V(0, .28, .2))], aIon);
     const aCap = THREE.MathUtils.smoothstep(value, .6, .72) * (1 - THREE.MathUtils.smoothstep(value, .86, .96));
     arrowCapture([nuPos.clone().add(V(-.1, .18, .25)), nuPos.clone().lerp(Cc, .5).add(V(0, .34, .25)), Cc.clone().add(V(.18, .2, .2))], aCap);
+    // the empty p orbital exists only while the carbocation does
+    const cationLive = THREE.MathUtils.smoothstep(value, .34, .46) * (1 - THREE.MathUtils.smoothstep(value, .58, .7));
+    pLobes.forEach((l) => { l.material.opacity = cationLive * .42; l.visible = cationLive > .02; });
+    // BOTH faces of the flat cation are open: show each approach, then only one commits
+    faceA([V(2.3, 1.15, 0), V(1.2, .55, 0), V(.55, .12, 0)], cationLive * .9);
+    faceB([V(-2.3, -1.15, 0), V(-1.2, -.55, 0), V(-.55, -.12, 0)], cationLive * .9);
+    faceLabel.visible = cationLive > .35;
     catCharge.visible = value > .4 && value < .62;
     brCharge.visible = value > .28;
     nuCharge.visible = value < .55;
@@ -1166,8 +1221,7 @@ function carbonylAdditionMechanism(progress) {
   const hyd = atom(g, [0, 0, 0], .15, 0xdfe6e3, 'Nucleophile', { roughness: .34, emissive: 0x9fb0ac, emissiveIntensity: .12 });
   const meBond = animatedMechanismBond(g, 0x68716e, .062, 'Electrophile');
   const aldBond = animatedMechanismBond(g, 0x68716e, .052, 'Electrophile');
-  const coSigma = animatedMechanismBond(g, 0x45504d, .066, 'Transition state');   // always present
-  const coPi = animatedMechanismBond(g, 0x45504d, .05, 'Transition state');      // the second line of C=O
+  const coBond = orderBond(g, 0x45504d, .062, 'Transition state');   // C=O -> C-O as it adds
   const cHyd = animatedMechanismBond(g, 0x67a85f, .062, 'Nucleophile');
   const arrowNu = mechanismElectronArrow(g, 'Nucleophile');
   const arrowCO = mechanismElectronArrow(g, 'Transition state');
@@ -1185,9 +1239,7 @@ function carbonylAdditionMechanism(progress) {
     const hp = tripodH(mePos, mePos.clone().sub(Cco), .55);
     meH.forEach((h, k) => { h.position.copy(hp[k]); meHb[k](mePos, hp[k], 1); });
     const dbl = 1 - THREE.MathUtils.smoothstep(value, .3, .85);
-    coSigma(Cco, oPos, 1);
-    const coOff = piOffset(Cco, oPos, .12);
-    coPi(Cco.clone().add(coOff), oPos.clone().add(coOff), dbl);
+    coBond(Cco, oPos, 1 + dbl);   // order 2 -> 1 as the pi electrons move onto oxygen
     cHyd(Cco, hyPos, THREE.MathUtils.smoothstep(value, .32, .9));
     const op = THREE.MathUtils.smoothstep(value, .15, .3) * (1 - THREE.MathUtils.smoothstep(value, .72, .86));
     arrowNu([hyPos.clone().add(V(.12, .1, .24)), hyPos.clone().lerp(Cco, .5).add(V(.14, 0, .24)), Cco.clone().add(V(0, .22, .2))], op);
@@ -1235,21 +1287,18 @@ function michaelMechanism(progress) {
   const meH = [0, 1, 2].map(() => atom(g, [0, 0, 0], .12, C.hydrogen, 'Electrophile', { roughness: .42 }));
   const meHb = [0, 1, 2].map(() => animatedMechanismBond(g, 0x767c79, .042, 'Electrophile'));
   atom(g, c2Hp.toArray(), .13, C.hydrogen, 'Transition state', { roughness: .42 });
-  atom(g, c3H1.toArray(), .13, C.hydrogen, 'Electrophile', { roughness: .42 });
-  atom(g, c3H2.toArray(), .13, C.hydrogen, 'Electrophile', { roughness: .42 });
+  const c3Ha = atom(g, c3H1.toArray(), .13, C.hydrogen, 'Electrophile', { roughness: .42 });
+  const c3Hb = atom(g, c3H2.toArray(), .13, C.hydrogen, 'Electrophile', { roughness: .42 });
   const nu = atom(g, [0, 0, 0], .26, NU_COLOR, 'Nucleophile', { roughness: .26, emissive: NU_COLOR, emissiveIntensity: .12 });
   const protonH = atom(g, [0, 0, 0], .14, C.hydrogen, 'Nucleophile', { roughness: .34 });
   const protonLabel = labelSprite('H⁺', '#ffd36b', .2); protonH.add(protonLabel); protonLabel.position.set(.42, -.05, 0);
   bond(g, c1.toArray(), meC.toArray(), .062, 0x68716e, 'Electrophile');
   bond(g, c2.toArray(), c2Hp.toArray(), .052, 0x68716e, 'Transition state');
-  bond(g, c3.toArray(), c3H1.toArray(), .052, 0x68716e, 'Electrophile');
-  bond(g, c3.toArray(), c3H2.toArray(), .052, 0x68716e, 'Electrophile');
-  bond(g, c1.toArray(), c2.toArray(), .066, 0x69736f, 'Electrophile');
-  bond(g, c2.toArray(), c3.toArray(), .066, 0x69736f, 'Electrophile');
-  bond(g, c1.toArray(), oPos.toArray(), .066, 0x45504d, 'Transition state');
-  const c1c2Pi = animatedMechanismBond(g, 0x67a85f, .05, 'Transition state');
-  const c2c3Pi = animatedMechanismBond(g, 0x69736f, .05, 'Electrophile');
-  const coPi = animatedMechanismBond(g, 0x45504d, .05, 'Transition state');
+  const c3HaBond = animatedMechanismBond(g, 0x68716e, .052, 'Electrophile');
+  const c3HbBond = animatedMechanismBond(g, 0x68716e, .052, 'Electrophile');
+  const c1c2Bond = orderBond(g, 0x69736f, .062, 'Transition state');   // single -> double (enolate)
+  const c2c3Bond = orderBond(g, 0x69736f, .062, 'Electrophile');       // double -> single (Nu adds)
+  const c1oBond = orderBond(g, 0x45504d, .062, 'Transition state');    // C=O -> C-O(-) -> C=O
   const c3Nu = animatedMechanismBond(g, 0x67a85f, .066, 'Nucleophile');
   const c2Proton = animatedMechanismBond(g, 0x69716e, .052, 'Nucleophile');
   const arrowNu = mechanismElectronArrow(g, 'Nucleophile');
@@ -1271,13 +1320,23 @@ function michaelMechanism(progress) {
     protonH.position.copy(pPos);
     const hp = tripodH(meC, meC.clone().sub(c1), .55);
     meH.forEach((h, k) => { h.position.copy(hp[k]); meHb[k](meC, hp[k], 1); });
-    const off23 = piOffset(c2, c3, .14);
-    const off12 = piOffset(c1, c2, .14);
-    const offCO = piOffset(c1, oMesh.position, .14);
-    c2c3Pi(c2.clone().add(off23), c3.clone().add(off23), 1 - THREE.MathUtils.smoothstep(value, .25, .6));
-    c1c2Pi(c1.clone().add(off12), c2.clone().add(off12), THREE.MathUtils.smoothstep(value, .28, .6) * (1 - THREE.MathUtils.smoothstep(value, .8, .96)));
-    coPi(c1.clone().add(offCO), oMesh.position.clone().add(offCO), Math.max(1 - THREE.MathUtils.smoothstep(value, .35, .62), THREE.MathUtils.smoothstep(value, .82, .98)));
-    c3Nu(c3, nuPos, THREE.MathUtils.smoothstep(value, .3, .62));
+    // bond orders through the conjugate addition:
+    //   C2=C3 (2 -> 1) as the nucleophile adds
+    //   C1-C2 (1 -> 2) forming the enolate, then back to 1 on protonation
+    //   C1=O  (2 -> 1) to the alkoxide, then back to 2 when the ketone is restored
+    const nuAdds = THREE.MathUtils.smoothstep(value, .25, .62);
+    const enol = THREE.MathUtils.smoothstep(value, .28, .62) * (1 - THREE.MathUtils.smoothstep(value, .8, .96));
+    c2c3Bond(c2, c3, 2 - nuAdds);
+    c1c2Bond(c1, c2, 1 + enol);
+    c1oBond(c1, oMesh.position, 2 - Math.max(0, enol));
+    c3Nu(c3, nuPos, nuAdds);
+    // THE BETA CARBON REHYBRIDISES. Once the Nu bonds to it, C3 is sp3, so its two hydrogens
+    // must swing out of the old sp2 plane to the real tetrahedral sites.
+    const sp3 = sp3Others(c2.clone().sub(c3), nuPos.clone().sub(c3));
+    const hA = c3H1.clone().lerp(c3.clone().addScaledVector(sp3[0], .92), nuAdds);
+    const hB = c3H2.clone().lerp(c3.clone().addScaledVector(sp3[1], .92), nuAdds);
+    c3Ha.position.copy(hA); c3Hb.position.copy(hB);
+    c3HaBond(c3, hA, 1); c3HbBond(c3, hB, 1);
     c2Proton(c2, pPos, THREE.MathUtils.smoothstep(value, .82, 1));
     const op = THREE.MathUtils.smoothstep(value, .12, .26) * (1 - THREE.MathUtils.smoothstep(value, .56, .7));
     arrowNu([nuPos.clone().add(V(.1, .1, .24)), nuPos.clone().lerp(c3, .5).add(V(.1, .1, .24)), c3.clone().add(V(.12, .2, .2))], op);
@@ -2607,8 +2666,8 @@ const co2Atoms = (g) => ({
   cC: atom(g, [0, 0, 0], .3, C.carbon, 'Carbon', { roughness: .3 }),
   oL: atom(g, [-CO2_L, 0, 0], .34, C.oxygen, 'Oxygen', { roughness: .3 }),
   oR: atom(g, [CO2_L, 0, 0], .34, C.oxygen, 'Oxygen', { roughness: .3 }),
-  bL: animatedMechanismDoubleBond(g, 0x45504d, .03, .12, 'Carbon'),
-  bR: animatedMechanismDoubleBond(g, 0x45504d, .03, .12, 'Carbon'),
+  bL: orderBond(g, 0x45504d, .055, 'Carbon'),
+  bR: orderBond(g, 0x45504d, .055, 'Carbon'),
 });
 const nearestMode = (modes, value, width = .05) => {
   let best = null, amp = 0;
@@ -2643,7 +2702,7 @@ function irScene(g, progress, tt) {
     const { amps, best, amp } = nearestMode(modes, value);
     const st = co2State(amps.sym || 0, amps.asym || 0, amps.bend || 0, tt2);
     mol.oL.position.copy(st.pL); mol.oR.position.copy(st.pR); mol.cC.position.copy(st.pC);
-    mol.bL(st.pC, st.pL, 1); mol.bR(st.pC, st.pR, 1);
+    mol.bL(st.pC, st.pL, 2); mol.bR(st.pC, st.pR, 2);   // O=C=O
     const mag = st.mu.length();
     const show = mag > .04;
     if (show) {
@@ -2694,7 +2753,7 @@ function ramanScene(g, progress, tt) {
     const { amps, best, amp } = nearestMode(modes, value);
     const st = co2State(amps.sym || 0, amps.asym || 0, amps.bend || 0, tt2);
     mol.oL.position.copy(st.pL); mol.oR.position.copy(st.pR); mol.cC.position.copy(st.pC);
-    mol.bL(st.pC, st.pL, 1); mol.bR(st.pC, st.pR, 1);
+    mol.bL(st.pC, st.pL, 2); mol.bR(st.pC, st.pR, 2);   // O=C=O
     const k = 1 + (st.polar - 1) * 2.6;
     cloud.scale.set(1.95 * k, 1.02 * k, 1.02 * k);
     const phase = -tt2 * 7;
@@ -2889,50 +2948,74 @@ function nmrScene(g, progress, tt) {
   };
 }
 
-// Mass spectrometry -- ethanol with correct tetrahedral geometry (the old version had the
-// hydrogens eyeballed). Alpha-cleavage snaps the C-C bond next to oxygen; the selected
-// fragment flies to the detector while the neutral radical drifts away.
+// Mass spectrometry -- a real instrument, not a molecule next to a slab.
+//   SOURCE: a 70 eV electron knocks ONE electron out -> M+. (a radical cation)
+//   FRAGMENT: alpha-cleavage snaps the C-C bond next to oxygen. The oxygen lone pair swings in
+//             to make a full C=O pi bond -> CH2=OH+ (oxocarbenium). That is why 31 is the base peak.
+//   ANALYSER: only the CHARGED piece is accelerated down the flight tube. The neutral radical
+//             drifts off and is NEVER DETECTED - the single most-missed idea in MS.
+//   DETECTOR: the selected m/z arrives and registers.
 function massspecScene(g, progress, tt) {
   const V = (x, y, z) => new THREE.Vector3(x, y, z);
-  const eth = ethanolGeometry();
-  const left = new THREE.Group(); const right = new THREE.Group();
-  g.add(left, right);
-  const methyl = [atom(left, eth.c1.toArray(), .24, C.carbon, 'Methyl fragment', { roughness: .3 })];
-  eth.c1H.forEach((h) => {
-    methyl.push(atom(left, h.toArray(), .14, C.hydrogen, 'Methyl fragment', { roughness: .4 }));
-    bond(left, eth.c1.toArray(), h.toArray(), .042, 0x767c79, 'Methyl fragment');
-  });
-  const oxo = [
-    atom(right, eth.c2.toArray(), .24, C.carbon, 'Oxocarbenium', { roughness: .3 }),
-    atom(right, eth.o.toArray(), .28, C.oxygen, 'Oxocarbenium', { roughness: .3 }),
-  ];
-  eth.c2H.forEach((h) => {
-    oxo.push(atom(right, h.toArray(), .14, C.hydrogen, 'Oxocarbenium', { roughness: .4 }));
-    bond(right, eth.c2.toArray(), h.toArray(), .042, 0x767c79, 'Oxocarbenium');
-  });
-  oxo.push(atom(right, eth.oH.toArray(), .14, C.hydrogen, 'Oxocarbenium', { roughness: .4 }));
-  bond(right, eth.o.toArray(), eth.oH.toArray(), .042, 0x767c79, 'Oxocarbenium');
-  bond(right, eth.c2.toArray(), eth.o.toArray(), .062, 0x69736f, 'Oxocarbenium');
-  const ccBond = animatedMechanismBond(g, 0x69736f, .066, 'Alpha cleavage');   // the bond that breaks
-  const coPi = animatedMechanismBond(right, 0x67a85f, .05, 'Oxocarbenium');    // C=O pi of the oxocarbenium
+  const raw = ethanolGeometry();
+  const OFF = V(-2.3, -.55, 0);
+  const c1 = raw.c1.clone().add(OFF), c2 = raw.c2.clone().add(OFF), o = raw.o.clone().add(OFF);
+  const c1H = raw.c1H.map((h) => h.clone().add(OFF));
+  const c2H = raw.c2H.map((h) => h.clone().add(OFF));
+  const oH = raw.oH.clone().add(OFF);
 
-  const detector = new THREE.Mesh(new THREE.BoxGeometry(.16, 2.0, 1.0), material(0x8a938f, { roughness: .4, metalness: .3 }));
-  detector.position.set(3.05, 0, 0); tag(detector, 'Detector'); g.add(detector);
-  const detL = labelSprite('detector', '#c7d0cc', .32); detL.position.set(3.05, 1.35, 0); g.add(detL);
-  const blip = atom(g, [2.75, 0, 0], .15, 0xe0ad35, 'Detector', { emissive: 0xe0ad35, emissiveIntensity: .9 });
-  const ionLabel = labelSprite('M⁺• radical cation · m/z 46', '#e7c96a', .62); ionLabel.position.set(.1, 1.75, 0); tag(ionLabel, 'Molecular ion'); g.add(ionLabel);
+  // --- the instrument
+  const tube = new THREE.Mesh(new THREE.CylinderGeometry(.62, .62, 3.7, 30, 1, true), material(0xa9bcc4, {
+    transparent: true, opacity: .13, side: THREE.DoubleSide, depthWrite: false,
+  }));
+  tube.rotation.z = Math.PI / 2; tube.position.set(.7, -.55, 0); tag(tube, 'Analyser'); g.add(tube);
+  const tubeL = labelSprite('only the ION is accelerated', '#a9bcc4', .62); tubeL.position.set(.7, .25, 0); tag(tubeL, 'Analyser'); g.add(tubeL);
+  const detector = new THREE.Mesh(new THREE.BoxGeometry(.14, 1.6, .9), material(0x8a938f, { roughness: .4, metalness: .3 }));
+  detector.position.set(2.7, -.55, 0); tag(detector, 'Detector'); g.add(detector);
+  const detL = labelSprite('detector', '#c7d0cc', .3); detL.position.set(2.7, .35, 0); tag(detL, 'Detector'); g.add(detL);
+  const blip = atom(g, [2.45, -.55, 0], .15, 0xe0ad35, 'Detector', { emissive: 0xe0ad35, emissiveIntensity: .9 });
+
+  // --- ionisation: the 70 eV electron and the one it knocks out
+  const ionBeam = waveBeam(g, 0x5a6fd0, 'Ionisation');
+  const ejected = atom(g, [0, 0, 0], .1, 0x5a6fd0, 'Ionisation', { emissive: 0x5a6fd0, emissiveIntensity: .9 });
+  const ionL = labelSprite('e⁻ 70 eV', '#8ea0e8', .34); ionL.position.set(-3.35, .75, 0); tag(ionL, 'Ionisation'); g.add(ionL);
+  const ejL = labelSprite('knocks ONE electron out → M⁺•', '#8ea0e8', .7); ejL.position.set(-1.55, 1.28, 0); tag(ejL, 'Ionisation'); g.add(ejL);
+
+  // --- the molecule, in two halves that alpha-cleavage can separate
+  const left = new THREE.Group(); const right = new THREE.Group(); g.add(left, right);
+  atom(left, c1.toArray(), .24, C.carbon, 'Methyl fragment', { roughness: .3 });
+  c1H.forEach((h) => {
+    atom(left, h.toArray(), .14, C.hydrogen, 'Methyl fragment', { roughness: .4 });
+    bond(left, c1.toArray(), h.toArray(), .042, 0x767c79, 'Methyl fragment');
+  });
+  atom(right, c2.toArray(), .24, C.carbon, 'Oxocarbenium', { roughness: .3 });
+  atom(right, o.toArray(), .28, C.oxygen, 'Oxocarbenium', { roughness: .3 });
+  c2H.forEach((h) => {
+    atom(right, h.toArray(), .14, C.hydrogen, 'Oxocarbenium', { roughness: .4 });
+    bond(right, c2.toArray(), h.toArray(), .042, 0x767c79, 'Oxocarbenium');
+  });
+  atom(right, oH.toArray(), .14, C.hydrogen, 'Oxocarbenium', { roughness: .4 });
+  bond(right, o.toArray(), oH.toArray(), .042, 0x767c79, 'Oxocarbenium');
+  const coBond = orderBond(right, 0x45504d, .062, 'Oxocarbenium');     // C-O -> C=O on cleavage
+  const ccBond = animatedMechanismBond(g, 0x69736f, .066, 'Alpha cleavage');
+  const lonePair = mechanismElectronArrow(g, 'Oxocarbenium');          // O lone pair -> C=O pi
+
+  const chargeL = labelSprite('+', '#ffd36b', .18);
+  const neutralL = labelSprite('neutral radical · NEVER detected', '#c98f8f', .78);
+  const molL = labelSprite('M⁺• radical cation · m/z 46', '#e7c96a', .6);
+  [chargeL, neutralL, molL].forEach((l) => g.add(l));
   const caps = {
-    46: labelSprite('M⁺• intact · only 23% · the ion is fragile', '#e7c96a', .56),
-    31: labelSprite('α-cleavage → CH₂=OH⁺ · O donates a lone pair · BASE PEAK', '#8fd08a', .66),
-    45: labelSprite('M–H · lost one hydrogen · 42%', '#eda079', .48),
-    15: labelSprite('CH₃⁺ · no lone pair to help it · only 8%', '#c98f8f', .56),
+    46: labelSprite('M⁺• survives intact · only 23% · the ion is fragile', '#e7c96a', .78),
+    31: labelSprite('α-cleavage · O lone pair makes C=O⁺ · BASE PEAK', '#8fd08a', .78),
+    45: labelSprite('M–H · loses one hydrogen · 42%', '#eda079', .5),
+    15: labelSprite('CH₃⁺ · no lone pair to stabilise it · only 8%', '#c98f8f', .74),
   };
-  Object.values(caps).forEach((c) => { c.position.set(.95, -1.95, 0); g.add(c); });
+  Object.values(caps).forEach((c) => { c.position.set(.75, -2.0, 0); g.add(c); });
   const frags = [
-    { p: 15 / 60, mz: 15, fly: 'left' },
-    { p: 31 / 60, mz: 31, fly: 'right' },
-    { p: 45 / 60, mz: 45, fly: 'both' },
-    { p: 46 / 60, mz: 46, fly: 'both' },
+    { p: 15 / 60, mz: 15, ion: 'left' },
+    { p: 31 / 60, mz: 31, ion: 'right' },
+    { p: 45 / 60, mz: 45, ion: 'both' },
+    { p: 46 / 60, mz: 46, ion: 'both' },
   ];
 
   return (value, tt2) => {
@@ -2944,21 +3027,52 @@ function massspecScene(g, progress, tt) {
     const on = !!hit && amp > .45;
     Object.values(caps).forEach((c) => { c.visible = false; });
     if (on) caps[hit.mz].visible = true;
-    const broken = on && (hit.fly === 'left' || hit.fly === 'right');
-    const sep = broken ? amp : 0;
-    if (broken && hit.fly === 'right') {
-      right.position.set(sep * 1.5, 0, 0); left.position.set(-sep * .7, -sep * .4, 0);
-    } else if (broken && hit.fly === 'left') {
-      left.position.set(sep * 2.6, sep * .05, 0); right.position.set(-sep * .45, -sep * .5, 0);
-    } else { right.position.set(0, 0, 0); left.position.set(0, 0, 0); }
-    const lOpacity = broken && hit.fly === 'right' ? 1 - sep * .55 : 1;
-    left.traverse((o) => { if (o.material) { o.material.transparent = true; o.material.opacity = lOpacity; } });
-    ccBond(eth.c1.clone().add(left.position), eth.c2.clone().add(right.position), broken ? Math.max(0, 1 - sep * 2.2) : 1);
-    // the oxocarbenium: the oxygen lone pair becomes a real C=O pi bond
-    const oxoAmt = on && hit.mz === 31 ? amp : 0;
-    const oOff = piOffset(eth.c2, eth.o, .12);
-    coPi(eth.c2.clone().add(oOff), eth.o.clone().add(oOff), oxoAmt);
-    ionLabel.visible = on && hit.mz === 46;
+
+    // the ionising electron beam is always running in the source
+    ionBeam(V(-3.9, .55, 0), V(-2.75, -.35, 0), .36, -tt2 * 9, .11, .95);
+    const ejT = (tt2 * .55) % 1;
+    ejected.position.set(-2.0 + ejT * 1.1, -.15 + ejT * 1.2, 0);
+    ejected.material.opacity = 1 - ejT;
+    ejected.material.transparent = true;
+
+    const fly = on ? amp : 0;                 // how far down the tube the ION has travelled
+    const D = 4.75;
+    const ionIsLeft = on && hit.ion === 'left';
+    const ionIsRight = on && hit.ion === 'right';
+    const bothFly = on && hit.ion === 'both';
+
+    // the CHARGED fragment is accelerated; the NEUTRAL one just drifts away and is lost
+    left.position.set(ionIsLeft || bothFly ? fly * D : fly * .45, ionIsLeft || bothFly ? 0 : fly * 1.35, 0);
+    right.position.set(ionIsRight || bothFly ? fly * D : fly * .45, ionIsRight || bothFly ? 0 : fly * 1.35, 0);
+    const lost = (grp, isNeutral) => grp.traverse((ob) => {
+      if (!ob.material) return;
+      ob.material.transparent = true;
+      ob.material.opacity = isNeutral ? 1 - fly * .8 : 1;
+    });
+    lost(left, on && !ionIsLeft && !bothFly);
+    lost(right, on && !ionIsRight && !bothFly);
+
+    const broken = ionIsLeft || ionIsRight;
+    ccBond(c1.clone().add(left.position), c2.clone().add(right.position), broken ? Math.max(0, 1 - fly * 2.4) : 1);
+    // the oxocarbenium: the oxygen lone pair becomes a genuine C=O double bond
+    const oxo = ionIsRight ? amp : 0;
+    coBond(c2.clone().add(right.position), o.clone().add(right.position), 1 + oxo);
+    const oNow = o.clone().add(right.position);
+    const cNow = c2.clone().add(right.position);
+    lonePair([oNow.clone().add(V(.35, .55, .2)), oNow.clone().lerp(cNow, .5).add(V(.1, .5, .2)), cNow.clone().add(V(.1, .3, .15))], oxo * .95);
+
+    // charge and neutral tags follow the pieces they belong to
+    const ionGrp = ionIsLeft ? left : right;
+    const ionAnchor = (ionIsLeft ? c1 : c2).clone().add(ionGrp.position);
+    chargeL.visible = on;
+    chargeL.position.copy(bothFly ? c2.clone().add(right.position) : ionAnchor).add(V(.1, .55, 0));
+    const neutralGrp = ionIsLeft ? right : left;
+    const neutralAnchor = (ionIsLeft ? c2 : c1).clone().add(neutralGrp.position);
+    neutralL.visible = broken && fly > .35;
+    neutralL.position.copy(neutralAnchor).add(V(-.1, .7, 0));
+    molL.visible = on && hit.mz === 46;
+    molL.position.set(-1.55, .55, 0);
+
     blip.visible = on;
     blip.material.emissiveIntensity = .3 + amp;
     blip.scale.setScalar(.6 + amp * .9);
@@ -3085,9 +3199,9 @@ function analysisExhibit(progress, parameters = {}, step = 0, time = 0) {
   const tick = build(g, progress, time);
   g.userData.update = (value, params = {}, stepIndex, tt = 0) => tick(value, tt, params);
   g.userData.update(progress, parameters, step, time);
-  const scale = { ir: .8, raman: .66, uvvis: .62, nmr: .72, massspec: .64, xrd: .64, fluorescence: .68 }[id] || .75;
+  const scale = { ir: .8, raman: .66, uvvis: .62, nmr: .72, massspec: .6, xrd: .64, fluorescence: .68 }[id] || .75;
   g.scale.setScalar(scale);
-  const shift = { nmr: -.85, massspec: -.85, raman: -.3, ir: -.2 }[id] || 0;
+  const shift = { nmr: -.85, massspec: -.25, raman: -.3, ir: -.2 }[id] || 0;
   g.position.set(shift, 0, 0);
   if (TECHNIQUE_FLAT.has(id)) g.rotation.set(0, 0, 0);
   else g.rotation.set(.09, -.15, 0);
