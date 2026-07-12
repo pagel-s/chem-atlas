@@ -12,9 +12,19 @@ const assert = (condition, message) => {
   if (!condition) throw new Error(message);
 };
 
-assert(lessons.length === 12, 'Expected twelve chemistry exhibits.');
+assert(lessons.length === 18, 'Expected eighteen chemistry exhibits.');
+// The analytical suite: each technique needs a scene, a spectrum panel, and its parts.
+['ir', 'raman', 'uvvis', 'nmr', 'massspec', 'xrd', 'fluorescence'].forEach((id) => {
+  const lesson = lessons.find((item) => item.id === id);
+  assert(lesson && lesson.category === 'Analytical techniques', `Analytical exhibit missing: ${id}.`);
+  assert(app.includes(`lesson.id === '${id}'`), `${id}: spectrum panel is not wired into the stage.`);
+  assert(app.includes(`${id}:`), `${id}: missing from the App per-lesson maps.`);
+});
 const irLesson = lessons.find((lesson) => lesson.id === 'ir');
-assert(irLesson && irLesson.parts['Dipole moment'] && scene.includes('function irExhibit') && app.includes("lesson.id === 'ir'"), 'IR exhibit must expose the dipole-change selection rule and its spectrum inset.');
+const ramanLesson = lessons.find((lesson) => lesson.id === 'raman');
+assert(irLesson.parts['Dipole moment'] && ramanLesson.parts.Polarisability, 'IR and Raman must expose their different selection rules.');
+// Mutual exclusion must fall out of the shared geometry, not be asserted by hand.
+assert(scene.includes('function co2State') && scene.includes('mu: sum.clone().multiplyScalar(-1)') && scene.includes('polar: (rL + rR) / (2 * CO2_L)'), 'CO2 dipole and polarisability must be derived from one shared normal-mode geometry.');
 assert(new Set(lessons.map((lesson) => lesson.check.answer)).size >= 3, 'Knowledge-check answers must not share one position.');
 lessons.forEach((lesson) => {
   assert(lesson.steps.length === 4, `${lesson.id}: expected four authored investigation steps.`);
@@ -109,4 +119,4 @@ assert(scene.includes('const wasCompactMode = compactMode;') && scene.includes('
 assert(pdb5mzp.includes(' CFF '), '5MZP caffeine ligand CFF is missing.');
 assert(pdb8f76.includes(' PPI '), '8F76 propionate ligand PPI is missing.');
 
-console.log('Science integrity checks passed for 12 exhibits and 7 mechanism variants.');
+console.log('Science integrity checks passed for 18 exhibits and 7 mechanism variants.');
