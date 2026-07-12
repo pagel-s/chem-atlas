@@ -963,40 +963,6 @@ function geometry(progress) {
   g.scale.setScalar(.95); g.rotation.set(.24,-.4,.08); return g;
 }
 
-function lattice(progress) {
-  const g = new THREE.Group(); const extent = progress < .25 ? 1 : progress < .75 ? 2 : 3; const cleavageMode = progress >= .75; const spacing = .72;
-  for (let x = -extent; x <= extent; x += 1) for (let y = -extent; y <= extent; y += 1) for (let z = -extent; z <= extent; z += 1) {
-    const even = (x + y + z) % 2 === 0;
-    const distance = Math.sqrt(x * x + y * y + z * z);
-    const shear = cleavageMode && y > 0 ? spacing : 0;
-    atom(g, [x * spacing + shear, y * spacing + (cleavageMode && y > 0 ? .12 : 0), z * spacing], even ? .19 : .27, even ? 0x8c68b3 : C.chlorine, even ? 'Cation' : 'Anion', {
-      transparent: true, opacity: extent === 3 ? THREE.MathUtils.clamp(1.04 - distance * .075, .62, .96) : 1,
-      roughness: .3, metalness: .08,
-    });
-  }
-  const cellSize = spacing * 2;
-  const box = new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(cellSize, cellSize, cellSize)), new THREE.LineBasicMaterial({ color: 0xd0a947, transparent: true, opacity: .9 }));
-  tag(box, 'Unit cell'); g.add(box);
-  const octahedron = new THREE.Mesh(new THREE.OctahedronGeometry(spacing, 0), material(0xe0b449, { transparent: true, opacity: .1, side: THREE.DoubleSide, depthWrite: false }));
-  tag(octahedron, 'Coordination shell'); g.add(octahedron);
-  const octaEdges = new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.OctahedronGeometry(spacing, 0)), new THREE.LineBasicMaterial({ color: 0xd1a234, transparent: true, opacity: .82 }));
-  tag(octaEdges, 'Coordination shell'); g.add(octaEdges);
-  [[spacing,0,0],[-spacing,0,0],[0,spacing,0],[0,-spacing,0],[0,0,spacing],[0,0,-spacing]].forEach((p) => bond(g,[0,0,0],p,.018,0xd2aa46,'Coordination shell'));
-  const cationLabel = labelSprite('Na+', '#d8c7ee', .18); cationLabel.position.set(0,.42,0); g.add(cationLabel);
-  const shellLabel = labelSprite('6 Cl- NEAREST NEIGHBOURS', '#d8c7ee', .38); shellLabel.position.set(0,1.45,0); shellLabel.visible = false; g.add(shellLabel);
-  if (cleavageMode) {
-    const cleavage = new THREE.Mesh(new THREE.PlaneGeometry(5.8, 5.8), material(0xe2b44d, { transparent: true, opacity: .09, side: THREE.DoubleSide, depthWrite: false }));
-    cleavage.rotation.set(Math.PI / 2, 0, Math.PI / 4); cleavage.position.y = spacing * .5; tag(cleavage, 'Unit cell'); g.add(cleavage);
-    for (let index = -2; index <= 2; index += 1) {
-      arrow(g, [index * spacing, .35, -.3], [index * spacing - .3, .35, -.3], 0xdf6d50, 'Cation');
-      arrow(g, [index * spacing + .35, .72, -.3], [index * spacing + .65, .72, -.3], 0xdf6d50, 'Anion');
-    }
-    const fractureLabel = labelSprite('SHEAR ALIGNS LIKE CHARGES  ->  REPULSION  ->  BRITTLE FRACTURE', '#ef9d80', .58); fractureLabel.position.set(0,2.8,0); g.add(fractureLabel);
-  }
-  g.scale.setScalar(extent === 3 ? .72 : extent === 2 ? .86 : 1.15);
-  g.rotation.set(.5,-.55,.05); return g;
-}
-
 function labelSprite(text, color = '#f4f0e5', size = .54) {
   const canvas = document.createElement('canvas');
   canvas.width = 512; canvas.height = 96;
@@ -2092,20 +2058,14 @@ function latticeExhibit(progress) {
     const lower = new THREE.Group(); const upper = new THREE.Group(); cleavage.add(lower, upper);
     const lateralCells = [0, 1];
     const slabCenter = new THREE.Vector3(cellSize / 2, cellSize / 2, cellSize / 4);
-    const lowerOffset = slabCenter.clone().multiplyScalar(-1).add(new THREE.Vector3(0, 0, -.3));
-    const upperOffset = slabCenter.clone().multiplyScalar(-1).add(new THREE.Vector3(0, 0, .3));
+    const lowerOffset = slabCenter.clone().multiplyScalar(-1).add(new THREE.Vector3(0, 0, -.6));
+    const upperOffset = slabCenter.clone().multiplyScalar(-1).add(new THREE.Vector3(0, 0, .6));
     const lowerSeen = new Set(); const upperSeen = new Set();
     lateralCells.forEach((x) => lateralCells.forEach((y) => {
       addRockSaltCell(lower, [x, y, 0], lowerOffset, lowerSeen);
       addRockSaltCell(upper, [x, y, 1], upperOffset, upperSeen);
     }));
-    const addSlabFrame = (parent, z) => {
-      const frame = new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(3.78, 3.78, 1.02)), new THREE.LineBasicMaterial({ color: 0x83918d, transparent: true, opacity: .58 }));
-      frame.position.z = z; tag(frame, 'Unit cell'); parent.add(frame);
-    };
-    addSlabFrame(lower, -1.2);
-    addSlabFrame(upper, 1.2);
-    const cleavagePlane = new THREE.Mesh(new THREE.PlaneGeometry(3.82, 3.82), material(0xe2b44d, { transparent: true, opacity: .075, side: THREE.DoubleSide, depthWrite: false }));
+    const cleavagePlane = new THREE.Mesh(new THREE.PlaneGeometry(3.82, 3.82), material(0xe2b44d, { transparent: true, opacity: .16, side: THREE.DoubleSide, depthWrite: false }));
     tag(cleavagePlane, 'Cleavage plane'); cleavage.add(cleavagePlane);
     const planeEdges = new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.PlaneGeometry(3.82, 3.82)), new THREE.LineBasicMaterial({ color: 0xe2b44d, transparent: true, opacity: .48 }));
     tag(planeEdges, 'Cleavage plane'); cleavage.add(planeEdges);

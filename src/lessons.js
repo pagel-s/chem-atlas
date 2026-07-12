@@ -168,25 +168,25 @@ export const lessons = [
   },
   {
     id: 'lattice', number: '09', title: 'Crystal lattices', short: 'Order repeated in space', category: 'Solid-state chemistry', color: '#486d9b',
-    question: 'How can one repeating unit determine a material’s properties?',
-    summary: 'Build a three-dimensional ionic lattice and expose coordination, cleavage and repeating unit cells.',
-    evidence: 'Ideal rock-salt lattice · thermal motion and defects omitted',
-    control: ['Conventional cell', 'Coordination shell', '(001) cleavage'],
+    question: 'How can one repeating unit build a whole crystal and set its properties?',
+    summary: 'Start from the single repeating unit cell of rock salt, zoom in on how one ion is surrounded, then see why the crystal splits along flat planes.',
+    evidence: 'Ideal rock-salt (NaCl) lattice · thermal motion and defects omitted',
+    control: ['Unit cell', 'Coordination', 'Cleavage'],
     parts: {
-      Cation: 'A positively charged ion. In an ionic solid it is surrounded by oppositely charged neighbours.',
-      'Central cation': 'The selected Na+ at the centre of the coordination shell. Six Cl- neighbours lie along the three axes.',
-      Anion: 'A negatively charged ion whose size often dominates how the lattice packs.',
-      'Unit cell': 'A repeating volume that reproduces the crystal by translation. The model shows a conventional rock-salt cell, not the primitive cell.',
-      'Coordination shell': 'The nearest neighbouring particles around a chosen lattice site.',
-      'Cleavage plane': 'The displayed (001) plane is one member of the {100} family. Its halves open normal to [001], exposing neutral ideal surfaces. This is cleavage, not lateral shear.'
+      Cation: 'A positively charged ion — Na+ here (the smaller purple ion). It sits between the larger anions.',
+      'Central cation': 'The Na+ picked out at the centre of the coordination view. Its six Cl- neighbours sit one along each axis.',
+      Anion: 'A negatively charged ion — Cl- here (the larger green ion). Its size largely sets how the ions pack.',
+      'Unit cell': 'The smallest box that, repeated in every direction, builds the whole crystal. This is the conventional rock-salt cell: Cl- on the corners and faces, Na+ on the edges and centre.',
+      'Coordination shell': 'The nearest neighbours around one ion. In rock salt there are six, at the corners of an octahedron.',
+      'Cleavage plane': 'A flat plane the crystal prefers to split along, leaving two even, charge-balanced faces.'
     },
     steps: [
-      ['A pattern without molecules', 'An ionic crystal is best described as an extended charge-balanced lattice, not separate NaCl molecules.'],
-      ['Local coordination repeats', 'In the rock-salt structure each ion has six nearest neighbours of opposite charge.'],
-      ['Electrostatics stabilizes the solid', 'Attractions extend throughout the lattice while short-range repulsion prevents collapse.'],
-      ['A neutral plane can cleave', 'The displayed (001) plane belongs to the {100} family. Its halves separate normal to [001], exposing neutral ideal surfaces. This opening is cleavage, not a lateral shear that aligns like charges.']
+      ['One repeating unit', 'A salt crystal is a single pattern of ions repeated over and over in three dimensions — not a collection of separate NaCl molecules. The smallest box that repeats to build the whole crystal is the unit cell shown here.'],
+      ['Each ion’s neighbours', 'Zoom in on one ion. In rock salt every Na+ is surrounded by six Cl- (and every Cl- by six Na+), sitting at the corners of an octahedron — one on each axis. This is six-fold, or octahedral, coordination.'],
+      ['What holds it together', 'Opposite charges attract in every direction through the whole lattice, while the ions cannot overlap. This balance of attraction and repulsion is what makes the solid stable and rigid.'],
+      ['Why it cleaves', 'Because the pattern is so regular, the crystal splits along flat planes rather than at random. The plane shown is a (001) plane (one of the {100} family); the two halves lift straight apart along [001], leaving flat, charge-balanced faces — which is why cleaved salt crystals have clean, flat sides.']
     ],
-    check: { q: 'After selecting the central ion, what does its highlighted shell show?', options: ['Four like-charged neighbours', 'Eight nearest neighbours of mixed charge', 'Six nearest neighbours of opposite charge'], answer: 2, explanation: 'Rock salt has octahedral coordination: six opposite-charge nearest neighbours along three axes.' }
+    check: { q: 'In the coordination view, what surrounds the central ion?', options: ['Four like-charged neighbours', 'Eight nearest neighbours of mixed charge', 'Six nearest neighbours of opposite charge'], answer: 2, explanation: 'Rock salt has octahedral coordination: six opposite-charge nearest neighbours, one along each axis.' }
   },
   {
     id: 'electrochem', number: '10', title: 'Electrochemical cell', short: 'Chemical change, electric work', category: 'Electrochemistry', color: '#9b6428',

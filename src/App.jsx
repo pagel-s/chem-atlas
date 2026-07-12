@@ -42,7 +42,7 @@ const sceneLegends = {
   mechanism: ['electron pair', 'forming bond', 'breaking bond', 'reaction coordinate'],
   orbitals: ['positive phase (+)', 'negative phase (−)', 'nucleus'],
   geometry: ['bonding domain', 'lone-pair domain', 'bond dipole', 'net dipole'],
-  lattice: ['Na+', 'Cl-', 'neutral (001) cleavage plane', 'coordination = 6'],
+  lattice: ['Na+ (smaller cation)', 'Cl- (larger anion)', 'coordination = 6', 'flat cleavage plane'],
   electrochem: ['Zn(s) -> Zn2+ + 2e-', 'Cu2+ + 2e- -> Cu(s)', 'NO3- -> zinc anode', 'K+ -> copper cathode'],
   synthesis: ['one generic reaction question', 'manual serial flask', 'independent plate wells', 'illustrative analytical response'],
 };
@@ -56,7 +56,7 @@ const observationPrompts = {
   mechanism: ['Check the nucleophile and leaving group before scrubbing.', 'Pause near the maximum and inspect both curved electron arrows.', 'Compare the partial bonds with the energy marker.', 'Follow H, D and CH3 as the tetrahedral center inverts.'],
   orbitals: ['The s orbital is one sphere — a cloud of likely positions, not a shell.', 'Count the orbitals: one spherical s plus three p dumbbells on x, y and z.', 'Watch the same four orbitals become four tetrahedral sp³ hybrids.', 'Ask what stays the same: four orbitals in, four orbitals out.'],
   geometry: ['Count four electron domains around the central atom.', 'Compare an NH3 lone pair with its three bonding domains.', 'Read the measured H2O angle and dipole arrows.', 'Ask why methane’s four bond dipoles cancel.'],
-  lattice: ['Inspect the conventional cell boundary and its fractional sites.', 'Select the central Na+ and count six opposite-charge neighbours.', 'Rotate the octahedral coordination shell.', 'Watch the (001) plane open along [001]; it is a member of the neutral {100} cleavage family.'],
+  lattice: ['This one cube, repeated in every direction, is the whole crystal.', 'Find the central Na+ and count its six Cl- neighbours.', 'Rotate the octahedron: six nearest neighbours, one on each axis.', 'Watch the crystal lift apart along a flat plane into two even faces.'],
   electrochem: ['Start with the switch open: a potential difference is not a sustained current.', 'Close the switch and follow one Zn atom into solution with two electrons.', 'Follow the same two electrons to one Cu2+ ion as it deposits on copper.', 'Track two NO3- to the zinc side and two K+ to the copper side as charge is compensated.'],
   synthesis: ['Read the generic amide question before choosing a workflow.', 'Follow one measured manual dispensing step into a single planned flask.', 'Inspect the 4 x 6 plate: distinguish conditions, a replicate, and a blank control.', 'Treat the highlighted well as a candidate for verification, not a finished scalable procedure.'],
 };
@@ -110,7 +110,7 @@ function sceneReadout(id, progress, parameters = {}, mechanismId = 'sn2') {
     mechanism: mechanismReadout(mechanismId, progress),
     orbitals: [['In view', progress < .25 ? '1 s orbital' : progress < .75 ? '1 s + 3 p orbitals' : '4 sp³ hybrids'], ['Orbital count', progress < .25 ? '1 of 4 basis orbitals' : progress < .75 ? '4 basis orbitals (1 s + 3 p)' : '4 hybrids (4 → 4)'], ['Colour', 'wavefunction phase, not charge']],
     geometry: [['Electron domains', '4'], ['Molecular shape', progress < .25 ? 'tetrahedral' : progress < .75 ? 'trigonal pyramidal' : 'bent'], ['Bond angle', progress < .25 ? '109.5°' : progress < .75 ? '~107°' : '104.5°']],
-    lattice: [['Structure', 'rock salt: fcc sublattices'], ['Nearest neighbours', '6 opposite charge'], ['View', progress < .25 ? 'conventional cubic cell' : progress < .75 ? 'six-coordinate Na+ shell' : '(001) opens along [001]; {100} family']],
+    lattice: [['Structure', 'rock salt (NaCl)'], ['Coordination', '6 : 6, octahedral'], ['View', progress < .34 ? 'one unit cell' : progress < .67 ? 'one ion + 6 neighbours' : 'cleaving along a flat plane']],
     electrochem: [['Circuit state', circuitClosed ? 'closed: Zn -> wire -> Cu' : 'open: no sustained current'], ['Redox event', electrochemProgress < .18 ? 'ready: no net transfer' : electrochemProgress < .6 ? 'Zn(s) -> Zn2+(aq) + 2e-' : electrochemProgress < .8 ? 'Cu2+(aq) + 2e- -> Cu(s)' : 'one paired Zn/Cu event'], ['Electrode mass', electrochemProgress < .18 ? 'unchanged' : electrochemProgress < .6 ? 'Zn down; Cu unchanged' : electrochemProgress < .76 ? 'Zn down; Cu depositing' : 'Zn down; Cu up'], ['Charge compensation', electrochemProgress < .58 ? 'bridge awaits imbalance' : electrochemProgress < .94 ? '2 NO3- -> anode; 2 K+ -> cathode' : 'both half-cells rebalanced']],
     synthesis: [['Workflow stage', progress < .16 ? 'one defined reaction question' : progress < .48 ? 'manual serial flask' : progress < .8 ? 'parallel 24-well condition screen' : 'analyse -> choose -> verify'], ['Reaction identity', 'ArCO2H + RNH2 + coupling reagent -> ArCONHR'], ['Parallel unit', progress < .48 ? 'one planned condition' : 'independent wells, not one mixture'], ['Result status', progress < .8 ? 'no result before analysis' : 'candidate condition; verify at scale']],
   };
