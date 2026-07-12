@@ -1817,7 +1817,7 @@ function snowflakeExhibit(progress, initialParameters = {}) {
 
   const vapourWaters = [];
   for (let index = 0; index < 22; index += 1) {
-    const angle = index * 2.399963; const radius = 2.45 + seeded(index, 2) * .85;
+    const angle = index * 2.399963; const radius = 2.05 + seeded(index, 2) * .6;
     const source = new THREE.Vector3(Math.cos(angle) * radius, Math.sin(angle) * radius, seeded(index, 3) * .32 - .18);
     const water = addWater(vapour, source, angle + Math.PI, .56, 'Hydrogen bond');
     water.userData.source = source.clone(); water.userData.angle = angle; water.userData.offset = seeded(index, 4);
@@ -1826,8 +1826,8 @@ function snowflakeExhibit(progress, initialParameters = {}) {
   const tipTracks = [];
   for (let index = 0; index < 18; index += 1) {
     const angle = (index % 6) * Math.PI / 3 + (seeded(index, 5) - .5) * .13;
-    const particle = atom(g, [Math.cos(angle) * 2.55, Math.sin(angle) * 2.55, .2], .026, 0x7ab9c5, 'Branch', { transparent: true, opacity: .42, emissive: 0x4f8790, emissiveIntensity: .2 });
-    particle.userData.angle = angle; particle.userData.radius = 2.55 + Math.floor(index / 6) * .28; tipTracks.push(particle);
+    const particle = atom(g, [Math.cos(angle) * 2.2, Math.sin(angle) * 2.2, .2], .026, 0x7ab9c5, 'Branch', { transparent: true, opacity: .42, emissive: 0x4f8790, emissiveIntensity: .2 });
+    particle.userData.angle = angle; particle.userData.radius = 2.2 + Math.floor(index / 6) * .22; tipTracks.push(particle);
   }
   const habitLabels = ['REPRESENTATIVE COLUMN / NEEDLE REGIME', 'REPRESENTATIVE PLATE REGIME', 'REPRESENTATIVE DENDRITIC-PLATE REGIME'].map((text) => {
     const item = labelSprite(text, '#c5eaee', .25); item.position.set(0, 2.12, .2); g.add(item); return item;
@@ -1855,7 +1855,7 @@ function snowflakeExhibit(progress, initialParameters = {}) {
     });
     vapourWaters.forEach((water, index) => {
       const capture = THREE.MathUtils.clamp(value * 1.17 - index * .025, 0, 1);
-      const targetRadius = 1.95 + (index % 6 === 0 && dendritic ? .48 : 0);
+      const targetRadius = 1.7 + (index % 6 === 0 && dendritic ? .42 : 0);
       const target = new THREE.Vector3(Math.cos(water.userData.angle) * targetRadius, Math.sin(water.userData.angle) * targetRadius, .02);
       water.position.copy(water.userData.source).lerp(target, capture);
       water.visible = value > .04 && capture < .98;
@@ -1950,6 +1950,14 @@ function catalystExhibit(progress) {
   const monolithBlock = new THREE.Mesh(new THREE.ExtrudeGeometry(honeycombShape(), { depth: channelDepth, bevelEnabled: false, curveSegments: 1 }), channelWall);
   monolithBlock.position.z = -channelDepth; tag(monolithBlock, 'Honeycomb'); monolith.add(monolithBlock);
   channelCenters.forEach((center, index) => addChannelBack(monolith, center, index === selectedChannelIndex));
+  const mouthRing = new THREE.Mesh(new THREE.RingGeometry(.2, .247, 6), material(0xc3a76c, {
+    transparent: true, opacity: .95, emissive: 0x7b5718, emissiveIntensity: .34, side: THREE.DoubleSide, depthWrite: false,
+  }));
+  mouthRing.rotation.z = Math.PI / 6;
+  mouthRing.position.set(selectedChannelCenter.x, selectedChannelCenter.y, .014);
+  tag(mouthRing, 'Selected channel wall'); monolith.add(mouthRing);
+  const monolithL = labelSprite('the marked channel', '#e0c07a', .3);
+  monolithL.position.set(0, 1.12, .05); tag(monolithL, 'Selected channel wall'); monolith.add(monolithL); monolithL.visible = true;
 
   // An irregular extruded oxide patch with real holes conveys porous washcoat
   // morphology without turning the coating into a regular honeycomb or disk.
@@ -1958,22 +1966,6 @@ function catalystExhibit(progress) {
   backingPatch.moveTo(...oxideOutline[0]); backingPatch.lineTo(...oxideOutline[0]); oxideOutline.slice(1).forEach((point) => backingPatch.lineTo(...point)); backingPatch.lineTo(...oxideOutline[0]);
   const backingMesh = new THREE.Mesh(new THREE.ExtrudeGeometry(backingPatch, { depth: .035, bevelEnabled: true, bevelThickness: .008, bevelSize: .007, bevelSegments: 1, curveSegments: 14 }), material(0x726b5d, { roughness: .98 }));
   backingMesh.position.z = -.092; tag(backingMesh, 'Selected channel wall'); washcoat.add(backingMesh);
-  // Faint neighbouring faces keep the magnified coating legible as one wall of
-  // a hexagonal channel rather than an isolated planar sample.
-  const foldedWallRails = new THREE.LineSegments(
-    new THREE.BufferGeometry().setFromPoints([
-      new THREE.Vector3(-.7,-.62,-.065), new THREE.Vector3(-.7,.62,-.065),
-      new THREE.Vector3(.7,-.62,-.065), new THREE.Vector3(.7,.62,-.065),
-      new THREE.Vector3(-.7,-.62,-.065), new THREE.Vector3(-.92,-.62,.25),
-      new THREE.Vector3(-.7,.62,-.065), new THREE.Vector3(-.92,.62,.25),
-      new THREE.Vector3(-.92,-.62,.25), new THREE.Vector3(-.92,.62,.25),
-      new THREE.Vector3(.7,-.62,-.065), new THREE.Vector3(.92,-.62,.25),
-      new THREE.Vector3(.7,.62,-.065), new THREE.Vector3(.92,.62,.25),
-      new THREE.Vector3(.92,-.62,.25), new THREE.Vector3(.92,.62,.25),
-    ]),
-    new THREE.LineBasicMaterial({ color: 0x9b947f, transparent: true, opacity: .3, depthWrite: false }),
-  );
-  tag(foldedWallRails, 'Selected channel wall'); washcoat.add(foldedWallRails);
   const oxidePatch = new THREE.Shape();
   oxidePatch.moveTo(...oxideOutline[0]); oxideOutline.slice(1).forEach((point) => oxidePatch.lineTo(...point)); oxidePatch.lineTo(...oxideOutline[0]);
   [[-.42,.44,.055,.04],[-.07,.45,.07,.045],[.36,.43,.05,.07],[.52,.06,.075,.05],[.39,-.22,.055,.075],[-.4,-.19,.07,.05],[-.17,-.5,.05,.07],[.2,-.45,.065,.045],[-.55,.08,.05,.07]].forEach(([x, y, rx, ry]) => {
@@ -1986,6 +1978,8 @@ function catalystExhibit(progress) {
     new THREE.LineBasicMaterial({ color: 0xc3a76c, transparent: true, opacity: .9, depthWrite: false }),
   );
   tag(washcoatOutline, 'Washcoat'); washcoat.add(washcoatOutline);
+  const washcoatL = labelSprite('porous washcoat on that wall · µm', '#e0c07a', .15);
+  washcoatL.position.set(-.28, .21, .12); tag(washcoatL, 'Washcoat'); washcoat.add(washcoatL); washcoatL.visible = true;
   [[-.32,.24], [.08,-.29]].forEach(([x, y]) => {
     [[0,0],[.055,.012],[-.018,.05]].forEach(([dx, dy], index) => atom(washcoat, [x + dx, y + dy, .065 + index * .005], .028, index === 1 ? 0xe2e7e4 : 0xc3cece, 'Metal site', { ...pt, transparent: true, opacity: .42 }));
   });
@@ -2006,6 +2000,8 @@ function catalystExhibit(progress) {
   particleHalo.position.z = .078; tag(particleHalo, 'Selected Pt nanoparticle'); selectedParticle.add(particleHalo);
   const particleFacetHalo = new THREE.Mesh(new THREE.RingGeometry(.1, .124, 6), material(0xc3a76c, { transparent: true, opacity: .78, emissive: 0x7b5718, emissiveIntensity: .18, side: THREE.DoubleSide, depthWrite: false }));
   particleFacetHalo.position.z = .079; tag(particleFacetHalo, 'Pt(111) terrace'); selectedParticle.add(particleFacetHalo);
+  const particleL = labelSprite('one Pt nanoparticle · nm', '#e0c07a', .14);
+  particleL.position.set(0, .3, .1); tag(particleL, 'Selected Pt nanoparticle'); selectedParticle.add(particleL); particleL.visible = true;
   // The washcoat and its particle remain attached to the marked inner wall.
   // The camera, rather than the particle, pivots to the facet inspection view.
   washcoat.quaternion.copy(wallSurfaceFrame);
@@ -2018,17 +2014,14 @@ function catalystExhibit(progress) {
   addHexLayer(surfaceLattice, 3, .06, [0,0], 0x657174, .04, .14, 'Selected Pt nanoparticle');
   addHexLayer(surfaceLattice, 3, .15, [.07,.04], 0x939d9d, .043, .14, 'Selected Pt nanoparticle');
   addHexLayer(surfaceLattice, 2, .25, [0,0], 0xd8dfda, .047, .14, 'Pt(111) terrace');
-  const particleOutline = new THREE.LineSegments(
-    new THREE.EdgesGeometry(new THREE.CylinderGeometry(.52, .38, .34, 6)),
-    new THREE.LineBasicMaterial({ color: 0x9ca7a4, transparent: true, opacity: .46, depthWrite: false }),
-  );
-  particleOutline.rotation.x = Math.PI / 2; particleOutline.position.z = .16; tag(particleOutline, 'Selected Pt nanoparticle'); particleContext.add(particleOutline);
   const facetPoints = Array.from({ length: 6 }, (_, index) => {
     const angle = index * Math.PI / 3 + Math.PI / 6;
     return new THREE.Vector3(Math.cos(angle) * .34, Math.sin(angle) * .34, .325);
   });
   const facetOutline = new THREE.LineLoop(new THREE.BufferGeometry().setFromPoints(facetPoints), new THREE.LineBasicMaterial({ color: 0xc3a76c, transparent: true, opacity: .9, depthWrite: false }));
   tag(facetOutline, 'Pt(111) terrace'); particleContext.add(facetOutline);
+  const terraceL = labelSprite('its top facet: Pt(111) terrace · atomic', '#e0c07a', .13);
+  terraceL.position.set(-.59, .13, .36); tag(terraceL, 'Pt(111) terrace'); particleContext.add(terraceL); terraceL.visible = true;
 
   const setGroupOpacity = (group, opacity) => {
     group.visible = opacity > .004;
@@ -2136,7 +2129,7 @@ function catalystExhibit(progress) {
   const productALift = new THREE.Vector3(-.46,.18,.74); const productBLift = new THREE.Vector3(.34,-.16,.92);
   const terraceFocus = wallAtomicAnchor.clone().add(new THREE.Vector3(0, 0, .25).applyQuaternion(wallSurfaceFrame));
   const reactionFocus = terraceFocus.clone().addScaledVector(wallSurfaceNormal, .42);
-  const faceOnOffset = wallSurfaceNormal.clone().multiplyScalar(3).addScaledVector(wallAxis, 1.25);
+  const faceOnOffset = wallSurfaceNormal.clone().multiplyScalar(3.7).addScaledVector(wallAxis, 1.5);
   const terraceOffset = wallSurfaceNormal.clone().multiplyScalar(2.9).addScaledVector(wallAxis, .95);
   const reactionOffset = wallSurfaceNormal.clone().multiplyScalar(3.4).addScaledVector(wallAxis, 1.2);
 
@@ -3301,8 +3294,8 @@ const discreteBuilders = new Set(['orbitals', 'geometry', 'lattice']);
 const discreteModelKey = (lessonId, value) => ['geometry', 'orbitals', 'lattice'].includes(lessonId) ? Math.round(value * 2) / 2 : (value >= .5 ? 1 : 0);
 const cameraViews = {
   battery: [[5.0,2.2,9.5],[5.0,2.2,9.5],[5.0,2.2,9.5],[5.0,2.2,9.5]],
-  snowflake: [[4.0,2.8,7.0],[4.6,2.4,9.2],[4.8,3.2,9.0],[4.4,2.8,8.4]],
-  catalyst: [[3.8,2.5,6.3],[1.7,1.0,3.0],[1.25,.8,2.35],[1.12,.72,2.15]],
+  snowflake: [[5.0,3.5,8.8],[4.6,2.4,9.2],[4.8,3.2,9.0],[4.4,2.8,8.4]],
+  catalyst: [[3.8,2.5,6.3],[2.1,1.25,3.7],[1.25,.8,2.35],[1.12,.72,2.15]],
   mechanism: [[5.4,2.5,8],[4.4,2.1,6.8],[4.1,1.7,6.4],[5.2,2.8,7.7]],
   orbitals: [[4.8,3.0,8.8],[4.3,2.4,7.8],[5.0,3.3,8.2],[4.3,2.4,7.8]],
   geometry: [[4.7,2.8,7.4],[4.2,2.4,6.9],[4.1,2.1,6.7],[4.6,2.8,7.1]],
