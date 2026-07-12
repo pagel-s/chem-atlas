@@ -1633,7 +1633,7 @@ function batteryExhibit(progress, initialParameters = {}) {
     pairLedger.visible = false;
     state.visible = false; platingLabel.visible = false;
   };
-  g.userData.update(progress, initialParameters); g.position.y = -.12; g.rotation.set(.1, -.18, 0); return g;
+  g.userData.update(progress, initialParameters); g.scale.setScalar(.84); g.position.set(-.5, -.34, 0); g.rotation.set(.1, -.18, 0); return g;
 }
 
 function snowflakeExhibit(progress, initialParameters = {}) {
@@ -2149,15 +2149,15 @@ function electrochemExhibit(progress, initialParameters = {}) {
 
   const anodeTitle = labelSprite('Zn ANODE (-) | OXIDATION', '#d8e0e3', .25); anodeTitle.position.set(left, .98, .18); anodeTitle.visible = true; tag(anodeTitle, 'Anode'); g.add(anodeTitle);
   const cathodeTitle = labelSprite('Cu CATHODE (+) | REDUCTION', '#a8d2e1', .25); cathodeTitle.position.set(right, .98, .18); cathodeTitle.visible = true; tag(cathodeTitle, 'Cathode'); g.add(cathodeTitle);
-  const anodeHalfReaction = labelSprite('Zn(s) -> Zn2+ + 2e-', '#d9e4e4', .19); anodeHalfReaction.position.set(left, -1.92, .08); anodeHalfReaction.visible = true; g.add(anodeHalfReaction);
-  const cathodeHalfReaction = labelSprite('Cu2+ + 2e- -> Cu(s)', '#a6d4e4', .19); cathodeHalfReaction.position.set(right, -1.92, .08); cathodeHalfReaction.visible = true; g.add(cathodeHalfReaction);
+  const anodeHalfReaction = labelSprite('Zn(s) -> Zn2+ + 2e-', '#d9e4e4', .19); anodeHalfReaction.position.set(left, -1.92, .08); anodeHalfReaction.visible = false; g.add(anodeHalfReaction);
+  const cathodeHalfReaction = labelSprite('Cu2+ + 2e- -> Cu(s)', '#a6d4e4', .19); cathodeHalfReaction.position.set(right, -1.92, .08); cathodeHalfReaction.visible = false; g.add(cathodeHalfReaction);
 
   const bridgeCurve = new THREE.CatmullRomCurve3([
     new THREE.Vector3(left + .72, -1.12, .14), new THREE.Vector3(left + .74, 1.2, .14),
     new THREE.Vector3(0, 1.62, .14), new THREE.Vector3(right - .74, 1.2, .14), new THREE.Vector3(right - .72, -1.12, .14),
   ]);
-  const bridge = new THREE.Mesh(new THREE.TubeGeometry(bridgeCurve, 90, .2, 18, false), material(0xdde8e0, { transparent: true, opacity: .14, side: THREE.DoubleSide, depthWrite: false, roughness: .5 }));
-  const bridgeGel = new THREE.Mesh(new THREE.TubeGeometry(bridgeCurve, 90, .13, 16, false), material(0xd0d4ae, { transparent: true, opacity: .2, depthWrite: false, roughness: .72 }));
+  const bridge = new THREE.Mesh(new THREE.TubeGeometry(bridgeCurve, 90, .2, 18, false), material(0xdde8e0, { transparent: true, opacity: .34, side: THREE.DoubleSide, depthWrite: false, roughness: .5 }));
+  const bridgeGel = new THREE.Mesh(new THREE.TubeGeometry(bridgeCurve, 90, .13, 16, false), material(0xd0d4ae, { transparent: true, opacity: .38, depthWrite: false, roughness: .72 }));
   tag(bridge, 'Salt bridge'); tag(bridgeGel, 'Salt bridge'); g.add(bridge, bridgeGel);
   const bridgeTitle = labelSprite('KNO3 SALT BRIDGE', '#e8dfb8', .2); bridgeTitle.position.set(0, 1.97, .14); bridgeTitle.visible = true; tag(bridgeTitle, 'Salt bridge'); g.add(bridgeTitle);
   [0.16, .34, .66, .84].forEach((t, index) => {
@@ -2176,7 +2176,7 @@ function electrochemExhibit(progress, initialParameters = {}) {
   atom(potassium, [.13,.04,0], .052, 0x6f9cc5, 'Potassium ion', { roughness: .3, emissive: 0x234e71, emissiveIntensity: .12 });
   const potassiumLabel = labelSprite('2 K+', '#9cc7e4', .17); potassiumLabel.position.set(.06, .24, 0); potassium.add(potassiumLabel);
 
-  const electronPath = new THREE.CatmullRomCurve3([new THREE.Vector3(left,1.58,0),new THREE.Vector3(left,2.38,0),new THREE.Vector3(-.28,2.66,0),new THREE.Vector3(.28,2.66,0),new THREE.Vector3(right,2.38,0),new THREE.Vector3(right,1.58,0)]);
+  const electronPath = new THREE.CatmullRomCurve3([new THREE.Vector3(left,1.42,0),new THREE.Vector3(left,2.38,0),new THREE.Vector3(-.28,2.66,0),new THREE.Vector3(.28,2.66,0),new THREE.Vector3(right,2.38,0),new THREE.Vector3(right,1.30,0)]);
   const leftWire = new THREE.CatmullRomCurve3([new THREE.Vector3(left,1.58,0),new THREE.Vector3(left,2.38,0),new THREE.Vector3(-.28,2.66,0)]);
   const rightWire = new THREE.CatmullRomCurve3([new THREE.Vector3(.28,2.66,0),new THREE.Vector3(right,2.38,0),new THREE.Vector3(right,1.58,0)]);
   [leftWire, rightWire].forEach((curve) => {
@@ -2188,9 +2188,9 @@ function electrochemExhibit(progress, initialParameters = {}) {
   switchLever.position.x = .235; tag(switchLever, 'External circuit'); switchPivot.add(switchLever);
   const leftContact = atom(g, [-.28,2.66,0], .065, 0xabb8b2, 'External circuit', { metalness: .7, roughness: .2 });
   const rightContact = atom(g, [.28,2.66,0], .065, 0xabb8b2, 'External circuit', { metalness: .7, roughness: .2 });
-  const switchOpenLabel = labelSprite('SWITCH OPEN: NO CURRENT', '#e4bd7d', .2); switchOpenLabel.position.set(0, 2.95, .12); g.add(switchOpenLabel);
-  const switchClosedLabel = labelSprite('SWITCH CLOSED: 2 e- THROUGH WIRE', '#f2d06e', .2); switchClosedLabel.position.set(0, 2.95, .12); g.add(switchClosedLabel);
-  const potentialLabel = labelSprite('E°cell = +1.10 V (standard conditions)', '#d6e4da', .2); potentialLabel.position.set(0, 2.3, .16); potentialLabel.visible = true; tag(potentialLabel, 'External circuit'); g.add(potentialLabel);
+  const switchOpenLabel = labelSprite('SWITCH OPEN: NO CURRENT', '#e4bd7d', .2); switchOpenLabel.position.set(-.75, 3.02, .12); g.add(switchOpenLabel);
+  const switchClosedLabel = labelSprite('SWITCH CLOSED: 2 e- THROUGH WIRE', '#f2d06e', .2); switchClosedLabel.position.set(-.75, 3.02, .12); g.add(switchClosedLabel);
+  const potentialLabel = labelSprite('E°cell = +1.10 V (standard conditions)', '#d6e4da', .2); potentialLabel.position.set(0, 2.3, .16); potentialLabel.visible = false; tag(potentialLabel, 'External circuit'); g.add(potentialLabel);
   const electronPacket = [0, 1].map(() => atom(g, [0,0,0], .072, 0xf1c444, 'Electron', { transparent: true, opacity: 0, emissive: 0xf1c444, emissiveIntensity: .82, roughness: .18 }));
   const electronLabel = labelSprite('2 e-', '#f5d467', .17); electronLabel.position.set(0, .2, 0); electronPacket[0].add(electronLabel);
 
@@ -2202,7 +2202,7 @@ function electrochemExhibit(progress, initialParameters = {}) {
   const anodeCharge = labelSprite('ANODE: EXCESS +2', '#e8a879', .18); anodeCharge.position.set(left, .63, .78); g.add(anodeCharge);
   const cathodeNeutral = labelSprite('CATHODE SOLUTION: NEUTRAL', '#d4e7eb', .18); cathodeNeutral.position.set(right, .63, .78); g.add(cathodeNeutral);
   const cathodeCharge = labelSprite('CATHODE: EXCESS -2', '#b8d8ef', .18); cathodeCharge.position.set(right, .63, .78); g.add(cathodeCharge);
-  const ledger = labelSprite('CLOSED-CIRCUIT EVENT: Zn(s) + Cu2+(aq)  ->  Zn2+(aq) + Cu(s)  |  2 e-', '#f2d06e', .39); ledger.position.set(0, 3.34, 0); g.add(ledger);
+  const ledger = labelSprite('CLOSED-CIRCUIT EVENT: Zn(s) + Cu2+(aq)  ->  Zn2+(aq) + Cu(s)  |  2 e-', '#f2d06e', .39); ledger.position.set(0, -2.25, 0); g.add(ledger);
   let switchClosure = (initialParameters.circuitClosed ?? progress > .02) ? 1 : 0;
 
   g.userData.update = (value, parameters = initialParameters) => {
@@ -2219,7 +2219,7 @@ function electrochemExhibit(progress, initialParameters = {}) {
     copperHydrated.position.set(THREE.MathUtils.lerp(right - .52, right - .18, deposit), THREE.MathUtils.lerp(-.62, -.92, deposit), THREE.MathUtils.lerp(-.14, .28, deposit));
     setOpacity(zincSurface, 1 - dissolve); setOpacity(zincHydrated, dissolve);
     setOpacity(copperHydrated, 1 - deposit); setOpacity(copperDeposit, deposit);
-    const electronFade = circuitClosed ? THREE.MathUtils.smoothstep(event, .2, .28) : 0;
+    const electronFade = circuitClosed ? THREE.MathUtils.smoothstep(event, .2, .28) * (1 - THREE.MathUtils.smoothstep(event, .76, .88)) : 0;
     electronPacket.forEach((electron, index) => {
       const packetProgress = THREE.MathUtils.smoothstep(event, .26 + index * .025, .55 + index * .025);
       electron.position.copy(electronPath.getPoint(packetProgress)); electron.position.z += index ? .075 : -.075;
@@ -2235,7 +2235,7 @@ function electrochemExhibit(progress, initialParameters = {}) {
     nitrateLabel.visible = counterionFade > .45; potassiumLabel.visible = counterionFade > .45;
     const anodeCharged = dissolve > .6 && balance < .92;
     const cathodeCharged = deposit > .6 && balance < .92;
-    anodeNeutral.visible = !anodeCharged; cathodeNeutral.visible = !cathodeCharged;
+    anodeNeutral.visible = false; cathodeNeutral.visible = false;
     anodeCharge.visible = anodeCharged; cathodeCharge.visible = cathodeCharged;
     ledger.visible = circuitClosed;
   };
@@ -3018,7 +3018,7 @@ const cameraTargets = {
   orbitals: [[.55,-.4,0],[.55,-.4,0],[.55,-.4,0],[.55,-.4,0]],
   geometry: [[.55,-.4,0],[.55,-.4,0],[.55,-.4,0],[.55,-.4,0]],
   lattice: [[.55,-.55,0],[.55,-.55,0],[.55,-.55,0],[0,0,0]],
-  electrochem: [[-.55,-.45,0],[-.55,-.45,0],[.8,-.45,0],[.4,.1,0]],
+  electrochem: [[-.15,-.45,0],[-.15,-.45,0],[.8,-.45,0],[.4,-.1,0]],
   synthesis: [[0,.1,0],[-.8,-.15,0],[.85,-.2,0],[.72,.35,0]],
   analysis: [[0,-.1,0],[0,-.1,0],[0,-.1,0],[0,-.1,0]],
 };
