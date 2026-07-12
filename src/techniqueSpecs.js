@@ -232,11 +232,12 @@ export const techniqueSpecs = [
     summary: 'Ethanol gives three signals. Where they sit tells you the environment, how much area they have counts the hydrogens, and how they are split tells you the neighbours.',
     evidence: 'Ethanol in CDCl3: CH3 delta 1.22 (t, J = 7 Hz, 3H), CH2 delta 3.69 (q, J = 7 Hz, 2H), OH delta ~2.6 (broad s, 1H; strongly dependent on solvent, temperature and concentration). Shifts are relative to TMS = 0. J = 7 Hz is ~0.02 ppm at 400 MHz, far too small to see on a 10 ppm axis, so the multiplets are drawn as expansions. The OH does not couple here because it exchanges rapidly. This is drawn as a frequency sweep (the old CW experiment); modern instruments pulse and Fourier-transform.',
     control: ['10 ppm', '0 ppm'],
-    legend: ['B₀ field', 'CH₃ (shielded)', 'CH₂ (deshielded by O)', 'OH (exchanging)'],
+    legend: ['B₀ field', 'spin α (with B₀) / β (against)', 'CH₃ shielded → upfield', 'CH₂ deshielded → downfield'],
     parts: {
       'B0 field': 'The external magnetic field. A bare proton would resonate at one frequency; everything interesting comes from the fact that electrons shield each proton slightly differently.',
       'CH3 protons': 'Three equivalent hydrogens, furthest from oxygen and therefore the most shielded — they resonate upfield at δ 1.22. Two CH₂ neighbours split them into a 1:2:1 triplet.',
       'CH2 protons': 'Two hydrogens on the carbon bearing oxygen. Oxygen withdraws electron density, so these protons are deshielded and appear downfield at δ 3.69. Three CH₃ neighbours split them into a 1:3:3:1 quartet.',
+      'Spin states': 'In the field a proton has two states: α (magnetic moment with B₀, lower energy) and β (against it, higher). The gap ΔE is set by the field the nucleus actually FEELS — which its electrons shield. Match ΔE with radio waves and the spin flips. More shielding → smaller ΔE → lower frequency → upfield.',
       'OH proton': 'One hydrogen on oxygen. It exchanges rapidly between molecules, which averages away its coupling — so it is a broad singlet, and its shift moves around with solvent and concentration.',
       Integral: 'The AREA under each signal, not its height, is proportional to the number of hydrogens. Here the areas are exactly 3 : 2 : 1.',
     },
@@ -341,13 +342,16 @@ export const techniqueSpecs = [
     ],
     readout: (progress) => {
       const mz = Math.round(progress * 60);
-      const near = [
+      const peaks = [
         { p: msX(15), id: 'CH₃⁺', rel: 8, why: 'primary cation, unstabilised' },
         { p: msX(29), id: 'CHO⁺ / C₂H₅⁺', rel: 26, why: 'secondary fragmentation' },
         { p: msX(31), id: 'CH₂=OH⁺', rel: 100, why: 'α-cleavage + lone-pair donation' },
         { p: msX(45), id: 'M–H', rel: 42, why: 'loss of H•' },
         { p: msX(46), id: 'M⁺•', rel: 23, why: 'intact radical cation' },
-      ].find((m) => Math.abs(progress - m.p) < .018);
+      ];
+      // 45 and 46 are adjacent, so match the NEAREST peak rather than the first in range
+      const best = peaks.reduce((a, b) => (Math.abs(progress - b.p) < Math.abs(progress - a.p) ? b : a));
+      const near = Math.abs(progress - best.p) < .014 ? best : null;
       return [
         ['Selected m/z', `${mz}`],
         ['Ion', near ? near.id : 'nothing at this mass'],
