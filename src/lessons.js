@@ -129,23 +129,22 @@ export const lessons = [
   },
   {
     id: 'orbitals', number: '07', title: 'Orbitals & hybridization', short: 'The shapes of bonding', category: 'Quantum chemistry', color: '#7a58a0',
-    question: 'How can the same four basis functions be redrawn as four directional hybrids?',
-    summary: 'Inspect 2s and 2p nodes, then compare them with the phase and directions of four sp3 combinations.',
+    question: 'What is an orbital, and how do one s and three p orbitals become four sp³ hybrids?',
+    summary: 'Start from what an orbital actually is, see the four basis orbitals (one s and three p) together, then watch the same four redrawn as four identical sp³ hybrids.',
     evidence: 'Phase-coloured qualitative isosurfaces · smooth teaching geometry, not a quantum-chemistry calculation',
-    control: ['2s orbital', '2p orbital', '4 sp³ hybrids'],
+    control: ['s orbital', 's + three p', '4 sp³ hybrids'],
     parts: {
-      's orbital': 'A spherical wavefunction whose sign can change across a radial node. The probability density is proportional to the square of its magnitude and has no sign.',
-      'p orbital': 'Two lobes of opposite wavefunction phase separated by a nodal plane.',
-      'Hybrid orbital': 'A directional combination of atomic-orbital wavefunctions used as a bonding model.',
-      Node: 'A region where the wavefunction is zero; wavefunction phase changes across a node.'
+      's orbital': 'A single spherical cloud showing where an s electron is likely to be found. It is one orbital, not a stack of shells.',
+      'p orbital': 'A dumbbell of two lobes on opposite sides of the nucleus. The two colours are opposite wavefunction phases (+ and −), and the flat gap between them is a node where the electron is never found. There are three, aligned with x, y and z.',
+      'Hybrid orbital': 'One of four equivalent sp³ orbitals made by combining the s orbital with the three p orbitals. Each points at a corner of a tetrahedron, with a large front lobe and a small back lobe.'
     },
     steps: [
-      ['Orbitals are wavefunctions', 'The smooth surfaces mark a chosen |ψ| isovalue; ψ sign is phase, while |ψ|² gives probability density. They are not solid electron shells.'],
-      ['Mixing preserves number', 'One s and three p orbitals can be recombined mathematically into four equivalent sp3 hybrids.'],
-      ['Recombination changes direction', 'The four sp3 combinations point toward tetrahedral directions. This is a change of mathematical basis, not a time animation of orbitals physically transforming.'],
-      ['A model with limits', 'Hybridization is a useful localized description, while molecular-orbital theory treats electrons across the whole molecule.']
+      ['What an orbital is', 'An orbital is a region around the nucleus where an electron is likely to be found — not a shell and not a fixed orbit. The surface drawn here encloses most of that chance; its colour is the wavefunction sign (phase), which is not electric charge. An s orbital is a single sphere.'],
+      ['One s and three p', 'These are the four basis orbitals for a second-row atom such as carbon: one spherical s orbital plus three dumbbell-shaped p orbitals at right angles along x, y and z. Four orbitals in total.'],
+      ['Combine into four hybrids', 'Add the s orbital to its three p orbitals and the same set can be redrawn as four identical sp³ hybrids pointing at the corners of a tetrahedron. Four orbitals go in and four come out — none is created or destroyed.'],
+      ['A model, with limits', 'Hybridization is a convenient way to picture the directions of local bonds. It is one description among others; molecular-orbital theory instead spreads electrons across the whole molecule.']
     ],
-    check: { q: 'What is conserved when the 2s/2p basis is redrawn as sp3 hybrids?', options: ['The number of orbitals', 'The direction of every original p lobe', 'The absence of wavefunction nodes'], answer: 0, explanation: 'One 2s plus three 2p functions are recombined into four sp3 functions; no orbital is created or destroyed.' }
+    check: { q: 'What is conserved when one s and three p orbitals are redrawn as sp³ hybrids?', options: ['The number of orbitals', 'The direction of every original p lobe', 'The absence of wavefunction nodes'], answer: 0, explanation: 'One s orbital plus three p orbitals recombine into four sp³ orbitals; no orbital is created or destroyed.' }
   },
   {
     id: 'geometry', number: '08', title: 'Molecular geometry', short: 'Electron domains arrange', category: 'Chemical bonding', color: '#28736d',

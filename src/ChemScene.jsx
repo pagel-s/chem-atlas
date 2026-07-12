@@ -870,22 +870,28 @@ function orbitals(progress) {
   };
 
   atom(g, [0, 0, 0], .16, C.carbon, 'Nucleus', { metalness: .22, roughness: .25 });
+  // A p orbital is a two-lobed dumbbell along one axis: opposite phase on each side,
+  // with a flat node through the nucleus where the two colours meet.
+  const addPOrbital = (axis, opacity = .58) => {
+    [[axis, positive], [axis.clone().multiplyScalar(-1), negative]].forEach(([dir, color]) => {
+      const lobe = new THREE.Mesh(new THREE.SphereGeometry(1, 40, 28), surface(color, opacity));
+      lobe.scale.set(.5, .95, .5);
+      lobe.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir.clone().normalize());
+      lobe.position.copy(dir).multiplyScalar(.82);
+      tag(lobe, 'p orbital'); g.add(lobe);
+    });
+  };
   if (progress < .25) {
-    addLobe(new THREE.Vector3(), new THREE.Vector3(.78, .78, .78), positive, 's orbital', .78);
-    // Transparency exposes the inner sign region without cutting a nonphysical
-    // wedge out of the spherical 2s isosurface.
-    const outer = new THREE.Mesh(new THREE.SphereGeometry(1.72, 48, 32), surface(negative, .22, THREE.DoubleSide));
-    tag(outer, 's orbital'); g.add(outer);
-    const radialNode = new THREE.Mesh(new THREE.SphereGeometry(1.06, 20, 14), material(0xe7d56d, { transparent: true, opacity: .13, wireframe: true, depthWrite: false }));
-    tag(radialNode, 'Node'); g.add(radialNode);
+    // s orbital: one spherical cloud, single phase. No radial node and no outer
+    // shell — the nested-sphere look is the shell misconception this exhibit dispels.
+    addLobe(new THREE.Vector3(), new THREE.Vector3(1.12, 1.12, 1.12), positive, 's orbital', .5);
   } else if (progress < .75) {
-    // The two isosurfaces meet only at x = 0. Their previous overlap crossed
-    // the nodal plane and contradicted the phase/sign teaching point.
-    addLobe(new THREE.Vector3(-1.12, 0, 0), new THREE.Vector3(1.12, .64, .64), positive, 'p orbital');
-    addLobe(new THREE.Vector3(1.12, 0, 0), new THREE.Vector3(1.12, .64, .64), negative, 'p orbital');
-    const plane = new THREE.Mesh(new THREE.PlaneGeometry(2.9, 2.9), material(0xe7d56d, { transparent: true, opacity: .15, side: THREE.DoubleSide, depthWrite: false }));
-    plane.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), new THREE.Vector3(1, 0, 0));
-    tag(plane, 'Node'); g.add(plane);
+    // The four basis orbitals shown together: one s (faint, at centre) plus three
+    // p orbitals on x, y, z. Seeing all four is the "4 in" half of the 4 -> 4 count.
+    addLobe(new THREE.Vector3(), new THREE.Vector3(.5, .5, .5), positive, 's orbital', .34);
+    addPOrbital(new THREE.Vector3(1, 0, 0));
+    addPOrbital(new THREE.Vector3(0, 1, 0));
+    addPOrbital(new THREE.Vector3(0, 0, 1));
   } else {
     [[1, 1, 1], [-1, -1, 1], [-1, 1, -1], [1, -1, -1]].forEach((values) => {
       const direction = new THREE.Vector3(...values).normalize();
