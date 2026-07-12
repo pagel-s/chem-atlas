@@ -1484,12 +1484,6 @@ function batteryExhibit(progress, initialParameters = {}) {
     site.position.set(-.15 + (siteIndex % 3) * .15, -1.25 + siteRow * .49, -.48 + siteDepth * .48);
     tag(site, 'Positive electrode'); cathode.add(site); cathodeLiSites.push(site);
   }
-  const coo6 = new THREE.Group(); coo6.position.set(0, .05, -.92); tag(coo6, 'Positive electrode'); cathode.add(coo6);
-  atom(coo6, [0, 0, 0], .13, 0x5574a5, 'Positive electrode', { roughness: .3, metalness: .2 });
-  [[.28,0,0],[-.28,0,0],[0,.28,0],[0,-.28,0],[0,0,.28],[0,0,-.28]].forEach((point) => {
-    atom(coo6, point, .07, C.oxygen, 'Positive electrode', { roughness: .35 });
-    bond(coo6, [0,0,0], point, .018, 0x9d5b55, 'Positive electrode');
-  });
   const cathodeLabel = labelSprite('IDEALIZED LAYERED-OXIDE HOST  |  O red · metal blue · Li amber'); cathodeLabel.position.set(0, -2.05, 0); cathode.add(cathodeLabel);
 
   const ionMeshes = [];
@@ -1572,8 +1566,6 @@ function batteryExhibit(progress, initialParameters = {}) {
     cathode.scale.setScalar(1);
     graphiteLabel.visible = false;
     cathodeLabel.visible = false;
-    coo6.visible = hostFocus > .01;
-    coo6.scale.setScalar(1);
     electrolyteLabel.visible = false;
     separatorLabel.visible = false;
     const pairCathodeSite = new THREE.Vector3(cathode.position.x - .15, -1.25, -.48);
@@ -2140,7 +2132,8 @@ function electrochemExhibit(progress, initialParameters = {}) {
     plate.position.set(x, .28, 0); tag(plate, part); g.add(plate);
     for (let row = 0; row < 7; row += 1) for (let depth = 0; depth < 3; depth += 1) {
       const face = side ? right - .18 : left + .18;
-      atom(g, [face, -1.22 + row * .28, -.22 + depth * .22], .047, side ? C.copper : C.zinc, part, { metalness: .7, roughness: .22 });
+      // keep every surface atom ON the plate: the plate spans y = -0.96 .. 1.52
+      atom(g, [face, -.82 + row * .24, -.22 + depth * .22], .047, side ? C.copper : C.zinc, part, { metalness: .7, roughness: .22 });
     }
     for (let index = 0; index < 10; index += 1) {
       atom(g, scatterPoint(index, x, side ? 31 : 17).toArray(), .034 + seeded(index, side ? 33 : 19) * .014, side ? 0x4c98b6 : 0x9eafb5, ionPart, { transparent: true, opacity: .48, roughness: .42 });
