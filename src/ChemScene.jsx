@@ -2419,7 +2419,69 @@ function latticeExhibit(progress) {
   return g;
 }
 
-const builders = { battery: batteryExhibit, binding, snowflake: snowflakeExhibit, catalyst: catalystExhibit, smell, mechanism, orbitals, geometry, lattice: latticeExhibit, electrochem: electrochemExhibit, synthesis: synthesisExhibit };
+// IR spectroscopy: CO2 normal modes. Sweeping the wavenumber (progress) brings each
+// mode into resonance; the mode vibrates in real time (time-driven) and only absorbs
+// when it changes the net dipole. The symmetric stretch is IR-silent (dipole stays 0).
+function irExhibit(progress, parameters = {}, step = 0, time = 0) {
+  const g = new THREE.Group();
+  const V = (x, y, z) => new THREE.Vector3(x, y, z);
+  const Lco = 1.2;
+  const cC = atom(g, [0, 0, 0], .3, C.carbon, 'Carbon', { roughness: .3 });
+  const oL = atom(g, [-Lco, 0, 0], .34, C.oxygen, 'Oxygen', { roughness: .3 });
+  const oR = atom(g, [Lco, 0, 0], .34, C.oxygen, 'Oxygen', { roughness: .3 });
+  const bondL = animatedMechanismDoubleBond(g, 0x45504d, .03, .12, 'Carbon');
+  const bondR = animatedMechanismDoubleBond(g, 0x45504d, .03, .12, 'Carbon');
+  const dipoleShaft = new THREE.Mesh(new THREE.CylinderGeometry(.032, .032, 1, 12), material(0xe0ad35, { emissive: 0x8a5d0d, emissiveIntensity: .25, transparent: true }));
+  const dipoleHead = new THREE.Mesh(new THREE.ConeGeometry(.11, .24, 14), material(0xe0ad35, { emissive: 0x8a5d0d, emissiveIntensity: .25, transparent: true }));
+  tag(dipoleShaft, 'Dipole moment'); tag(dipoleHead, 'Dipole moment'); g.add(dipoleShaft, dipoleHead);
+  const dipoleLabel = labelSprite('net dipole', '#ffd36b', .26); tag(dipoleLabel, 'Dipole moment'); g.add(dipoleLabel);
+  const capAsym = labelSprite('asymmetric stretch: dipole flips -> absorbs', '#cfe0e4', .55); capAsym.position.set(0, -1.15, 0); g.add(capAsym);
+  const capSym = labelSprite('symmetric stretch: no dipole change -> silent', '#e7c96a', .55); capSym.position.set(0, -1.15, 0); g.add(capSym);
+  const capBend = labelSprite('bend: dipole appears -> absorbs', '#cfe0e4', .44); capBend.position.set(0, -1.15, 0); g.add(capBend);
+  const modes = [
+    { p: .459, omega: 12, kind: 'asym' },
+    { p: .739, omega: 9, kind: 'sym' },
+    { p: .926, omega: 7, kind: 'bend' },
+  ];
+
+  g.userData.update = (value, params, stepIndex, tt = 0) => {
+    const dL = V(0, 0, 0), dR = V(0, 0, 0), dC = V(0, 0, 0);
+    let near = null, nearAmp = 0;
+    modes.forEach((m) => {
+      const amp = Math.exp(-Math.pow((value - m.p) / .05, 2));
+      if (amp > nearAmp) { nearAmp = amp; near = m; }
+      const osc = Math.sin(tt * m.omega) * amp * .3;
+      if (m.kind === 'sym') { dL.x -= osc; dR.x += osc; }
+      else if (m.kind === 'asym') { dL.x += osc; dR.x += osc; dC.x -= osc * .9; }
+      else { dL.y += osc; dR.y += osc; dC.y -= osc * 1.4; }
+    });
+    const pL = V(-Lco, 0, 0).add(dL), pR = V(Lco, 0, 0).add(dR), pC = V(0, 0, 0).add(dC);
+    oL.position.copy(pL); oR.position.copy(pR); cC.position.copy(pC);
+    bondL(pC, pL, 1); bondR(pC, pR, 1);
+    const mu = pC.clone().multiplyScalar(2).sub(pL).sub(pR);
+    const mag = mu.length();
+    const show = mag > .04;
+    dipoleShaft.visible = show; dipoleHead.visible = show; dipoleLabel.visible = show;
+    if (show) {
+      const dir = mu.clone().normalize();
+      const len = Math.min(mag * .9, 1.2);
+      const start = pC.clone().add(V(0, .55, 0));
+      const end = start.clone().addScaledVector(dir, len);
+      dipoleShaft.position.copy(start).lerp(end, .5);
+      dipoleShaft.scale.set(1, Math.max(.05, start.distanceTo(end)), 1);
+      dipoleShaft.quaternion.setFromUnitVectors(V(0, 1, 0), dir);
+      dipoleHead.position.copy(end); dipoleHead.quaternion.setFromUnitVectors(V(0, 1, 0), dir);
+      dipoleLabel.position.copy(start).add(V(-1.05, .3, 0));
+    }
+    capAsym.visible = near?.kind === 'asym' && nearAmp > .4;
+    capSym.visible = near?.kind === 'sym' && nearAmp > .4;
+    capBend.visible = near?.kind === 'bend' && nearAmp > .4;
+  };
+  g.userData.update(progress, parameters, step, time);
+  g.scale.setScalar(.85); g.rotation.set(.12, -.16, 0); return g;
+}
+
+const builders = { battery: batteryExhibit, binding, snowflake: snowflakeExhibit, catalyst: catalystExhibit, smell, mechanism, orbitals, geometry, lattice: latticeExhibit, electrochem: electrochemExhibit, synthesis: synthesisExhibit, ir: irExhibit };
 const discreteBuilders = new Set(['orbitals', 'geometry', 'lattice']);
 const discreteModelKey = (lessonId, value) => ['geometry', 'orbitals', 'lattice'].includes(lessonId) ? Math.round(value * 2) / 2 : (value >= .5 ? 1 : 0);
 const cameraViews = {
@@ -2432,6 +2494,7 @@ const cameraViews = {
   lattice: [[4.7,3.2,7.5],[4.1,2.7,6.7],[5.3,3.7,8.4],[5.1,3.4,8.1]],
   electrochem: [[5.2,3.2,8.5],[4.8,2.7,7.8],[4.8,2.7,7.8],[5.3,3.4,8.4]],
   synthesis: [[5.4,3.0,9.0],[4.95,2.75,8.35],[5.2,3.05,8.7],[4.9,2.8,8.3]],
+  ir: [[.6,1.4,8.2],[.6,1.4,8.2],[.6,1.4,8.2],[.6,1.4,8.2]],
 };
 const cameraTargets = {
   battery: [[0,-.45,0],[0,-.45,0],[0,-.45,0],[0,-.45,0]],
@@ -2443,6 +2506,7 @@ const cameraTargets = {
   lattice: [[.55,-.55,0],[.55,-.55,0],[.55,-.55,0],[0,0,0]],
   electrochem: [[-.55,-.45,0],[-.55,-.45,0],[.8,-.45,0],[.4,.1,0]],
   synthesis: [[0,.1,0],[-.8,-.15,0],[.85,-.2,0],[.72,.35,0]],
+  ir: [[0,.1,0],[0,.1,0],[0,.1,0],[0,.1,0]],
 };
 const mechanismCameraViews = {
   sn2: [[5.4,2.5,8],[4.4,2.1,6.8],[4.1,1.7,6.4],[5.2,2.8,7.7]],
@@ -2772,7 +2836,7 @@ export default function ChemScene({ lessonId, sceneVariant = '', progress, progr
       }
       const activeModel = modelRoot.children[0];
       if (typeof activeModel?.userData.update === 'function') {
-        activeModel.userData.update(currentProgress, parametersRef.current, stepRef.current);
+        activeModel.userData.update(currentProgress, parametersRef.current, stepRef.current, t);
       } else if (t - lastModelUpdate > .033) {
         const nextKey = discreteBuilders.has(lessonId)
           ? discreteModelKey(lessonId, currentProgress)

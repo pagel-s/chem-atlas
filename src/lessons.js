@@ -237,5 +237,25 @@ export const lessons = [
       ['Analyse, choose, verify', 'An illustrative response map highlights a candidate condition only after analysis. A microscale hit needs identity checks, repeat data, and flask-scale confirmation; automation supports judgement rather than replacing it.']
     ],
     check: { q: 'What can a parallel condition screen establish directly?', options: ['That the highlighted well will give the same isolated yield at scale', 'Which tested microscale condition has the strongest illustrative analytical response and should be verified next', 'That a robot changes the reaction mechanism inside each well'], answer: 1, explanation: 'Parallel automation can efficiently compare defined small-scale conditions, but analytical confirmation, replication, and scale-up are still required.' }
+  },
+  {
+    id: 'ir', number: '11', title: 'Infrared spectroscopy', short: 'Bonds absorb their own frequency', category: 'Analytical techniques', color: '#3f7d8c',
+    question: 'Why does a molecule absorb infrared light only at certain frequencies?',
+    summary: 'Sweep an infrared beam across CO2 and watch each vibration absorb — but only when the vibration changes the molecule’s net dipole.',
+    evidence: 'Idealized CO2 vibrational modes at representative wavenumbers (asymmetric stretch ~2349, symmetric stretch ~1340, bend ~667 cm-1) · amplitudes exaggerated and intensities schematic, not read from a measured spectrum',
+    control: ['4000 cm⁻¹', '400 cm⁻¹'],
+    parts: {
+      Carbon: 'The central carbon of CO2. Every vibration moves the atoms but leaves the molecule intact.',
+      Oxygen: 'The two oxygens. How they move relative to carbon decides whether the molecule’s dipole changes.',
+      'Dipole moment': 'The net separation of positive and negative charge. Infrared light is absorbed only by a vibration that makes this change; if it stays zero, the mode is IR-silent.',
+      'Absorption peak': 'A dip in transmitted infrared intensity at the frequency of an IR-active vibration.'
+    },
+    steps: [
+      ['A beam scans the molecule', 'Infrared light of many frequencies passes through the sample. The molecule only responds when the light matches one of its vibrations, so absorption happens at specific wavenumbers.'],
+      ['The asymmetric stretch absorbs', 'Near 2349 cm⁻¹ the two C=O bonds stretch out of step. The molecule is momentarily lopsided, so its dipole flips back and forth — a changing dipole absorbs infrared light, giving a strong peak.'],
+      ['A vibration that stays silent', 'Near 1340 cm⁻¹ both bonds stretch in step. The molecule stays symmetric, so the net dipole is zero the whole time. No change in dipole means no absorption: this mode is invisible in the IR spectrum.'],
+      ['The bend absorbs too', 'Near 667 cm⁻¹ the molecule bends. That breaks the linear symmetry and creates a dipole perpendicular to the axis, so infrared light is absorbed and another peak appears.']
+    ],
+    check: { q: 'Why is the symmetric stretch of CO2 invisible in the infrared spectrum?', options: ['Its frequency is outside the infrared range', 'It is too weak to detect but still present', 'The molecule stays symmetric, so its dipole moment does not change'], answer: 2, explanation: 'IR absorption requires a change in dipole moment; the symmetric stretch keeps the dipole at zero, so it is IR-silent even though the bonds are vibrating.' }
   }
 ];

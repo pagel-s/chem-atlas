@@ -12,7 +12,9 @@ const assert = (condition, message) => {
   if (!condition) throw new Error(message);
 };
 
-assert(lessons.length === 11, 'Expected eleven chemistry exhibits.');
+assert(lessons.length === 12, 'Expected twelve chemistry exhibits.');
+const irLesson = lessons.find((lesson) => lesson.id === 'ir');
+assert(irLesson && irLesson.parts['Dipole moment'] && scene.includes('function irExhibit') && app.includes("lesson.id === 'ir'"), 'IR exhibit must expose the dipole-change selection rule and its spectrum inset.');
 assert(new Set(lessons.map((lesson) => lesson.check.answer)).size >= 3, 'Knowledge-check answers must not share one position.');
 lessons.forEach((lesson) => {
   assert(lesson.steps.length === 4, `${lesson.id}: expected four authored investigation steps.`);
@@ -107,4 +109,4 @@ assert(scene.includes('const wasCompactMode = compactMode;') && scene.includes('
 assert(pdb5mzp.includes(' CFF '), '5MZP caffeine ligand CFF is missing.');
 assert(pdb8f76.includes(' PPI '), '8F76 propionate ligand PPI is missing.');
 
-console.log('Science integrity checks passed for 11 exhibits and 7 mechanism variants.');
+console.log('Science integrity checks passed for 12 exhibits and 7 mechanism variants.');

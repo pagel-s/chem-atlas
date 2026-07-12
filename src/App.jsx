@@ -1,6 +1,6 @@
 import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import {
-  Atom, BatteryCharging, BookOpen, Box, Check, ChevronLeft, ChevronRight,
+  Activity, Atom, BatteryCharging, BookOpen, Box, Check, ChevronLeft, ChevronRight,
   CircleDot, FlaskConical, Focus, Hexagon, Menu, MousePointer2, Pause, Play, Rotate3D,
   RotateCcw, Snowflake, Sparkles, Waves, X,
 } from 'lucide-react';
@@ -16,7 +16,7 @@ const lessons = allLessons.filter((lesson) => lesson.id !== 'synthesis');
 const icons = {
   battery: BatteryCharging, binding: Focus, snowflake: Snowflake, catalyst: Hexagon,
   smell: Waves, mechanism: Play, orbitals: CircleDot, geometry: Atom,
-  lattice: Box, electrochem: FlaskConical, synthesis: FlaskConical,
+  lattice: Box, electrochem: FlaskConical, synthesis: FlaskConical, ir: Activity,
 };
 
 const guidedViews = {
@@ -31,6 +31,7 @@ const guidedViews = {
   lattice: [{ progress: 0, part: 'Unit cell' }, { progress: .5, part: 'Coordination shell' }, { progress: .5, part: 'Central cation' }, { progress: 1, part: 'Cleavage plane' }],
   electrochem: [{ progress: 0, part: 'Anode' }, { progress: .35, part: 'Anode' }, { progress: .7, part: 'Cathode' }, { progress: 1, part: 'Salt bridge' }],
   synthesis: [{ progress: .04, part: 'Condition' }, { progress: .34, part: 'Manual flask' }, { progress: .68, part: 'Reaction plate' }, { progress: .96, part: 'Candidate condition' }],
+  ir: [{ progress: .06, part: 'Oxygen' }, { progress: .459, part: 'Dipole moment' }, { progress: .739, part: 'Dipole moment' }, { progress: .926, part: 'Dipole moment' }],
 };
 
 const sceneLegends = {
@@ -45,6 +46,7 @@ const sceneLegends = {
   lattice: ['Na+ (smaller cation)', 'Cl- (larger anion)', 'coordination = 6', 'flat cleavage plane'],
   electrochem: ['Zn(s) -> Zn2+ + 2e-', 'Cu2+ + 2e- -> Cu(s)', 'NO3- -> zinc anode', 'K+ -> copper cathode'],
   synthesis: ['one generic reaction question', 'manual serial flask', 'independent plate wells', 'illustrative analytical response'],
+  ir: ['C=O bonds', 'net dipole (gold arrow)', 'absorption peak', 'IR-silent mode'],
 };
 
 const observationPrompts = {
@@ -59,6 +61,7 @@ const observationPrompts = {
   lattice: ['This one cube, repeated in every direction, is the whole crystal.', 'Find the central Na+ and count its six Cl- neighbours.', 'Rotate the octahedron: six nearest neighbours, one on each axis.', 'Watch the crystal lift apart along a flat plane into two even faces.'],
   electrochem: ['Start with the switch open: a potential difference is not a sustained current.', 'Close the switch and follow one Zn atom into solution with two electrons.', 'Follow the same two electrons to one Cu2+ ion as it deposits on copper.', 'Track two NO3- to the zinc side and two K+ to the copper side as charge is compensated.'],
   synthesis: ['Read the generic amide question before choosing a workflow.', 'Follow one measured manual dispensing step into a single planned flask.', 'Inspect the 4 x 6 plate: distinguish conditions, a replicate, and a blank control.', 'Treat the highlighted well as a candidate for verification, not a finished scalable procedure.'],
+  ir: ['Scan the beam; the molecule only reacts near one of its vibration frequencies.', 'At 2349 cm⁻¹ the two C=O stretch out of step — the gold dipole arrow flips, so it absorbs.', 'At 1340 cm⁻¹ the molecule breathes symmetrically — the dipole stays zero and no peak appears.', 'At 667 cm⁻¹ the molecule bends — a dipole appears and it absorbs again.'],
 };
 
 function snowHabit(temperature, saturation) {
@@ -115,6 +118,16 @@ function sceneReadout(id, progress, parameters = {}, mechanismId = 'sn2') {
     lattice: [['Structure', 'rock salt (NaCl)'], ['Coordination', '6 : 6, octahedral'], ['View', progress < .34 ? 'one unit cell' : progress < .67 ? 'one ion + 6 neighbours' : 'cleaving along a flat plane']],
     electrochem: [['Circuit state', circuitClosed ? 'closed: Zn -> wire -> Cu' : 'open: no sustained current'], ['Redox event', electrochemProgress < .18 ? 'ready: no net transfer' : electrochemProgress < .6 ? 'Zn(s) -> Zn2+(aq) + 2e-' : electrochemProgress < .8 ? 'Cu2+(aq) + 2e- -> Cu(s)' : 'one paired Zn/Cu event'], ['Electrode mass', electrochemProgress < .18 ? 'unchanged' : electrochemProgress < .6 ? 'Zn down; Cu unchanged' : electrochemProgress < .76 ? 'Zn down; Cu depositing' : 'Zn down; Cu up'], ['Charge compensation', electrochemProgress < .58 ? 'bridge awaits imbalance' : electrochemProgress < .94 ? '2 NO3- -> anode; 2 K+ -> cathode' : 'both half-cells rebalanced']],
     synthesis: [['Workflow stage', progress < .16 ? 'one defined reaction question' : progress < .48 ? 'manual serial flask' : progress < .8 ? 'parallel 24-well condition screen' : 'analyse -> choose -> verify'], ['Reaction identity', 'ArCO2H + RNH2 + coupling reagent -> ArCONHR'], ['Parallel unit', progress < .48 ? 'one planned condition' : 'independent wells, not one mixture'], ['Result status', progress < .8 ? 'no result before analysis' : 'candidate condition; verify at scale']],
+    ir: (() => {
+      const wn = Math.round(4000 - progress * 3600);
+      const near = [{ p: .459, name: 'asymmetric stretch', active: true }, { p: .739, name: 'symmetric stretch', active: false }, { p: .926, name: 'bend', active: true }].find((m) => Math.abs(progress - m.p) < .06);
+      return [
+        ['IR wavenumber', `${wn} cm⁻¹`],
+        ['At this frequency', near ? near.name : 'no vibration (scanning)'],
+        ['Dipole change', near ? (near.active ? 'yes' : 'no (stays symmetric)') : '—'],
+        ['Result', near ? (near.active ? 'absorbs -> peak' : 'IR-silent -> no peak') : 'light passes through'],
+      ];
+    })(),
   };
   return values[id];
 }
@@ -152,7 +165,7 @@ export default function App() {
   const catalystScaleStage = progress < .2 ? 0 : progress < .48 ? 1 : progress < .62 ? 2 : 3;
   const guidedView = guidedSequence[Math.min(stepIndex, lesson.steps.length - 1)];
   const highlightedPart = selectedPart || (freeExplore ? null : guidedView.part);
-  const hasContinuousControl = ['battery', 'snowflake', 'catalyst', 'mechanism', 'electrochem', 'synthesis'].includes(lesson.id);
+  const hasContinuousControl = ['battery', 'snowflake', 'catalyst', 'mechanism', 'electrochem', 'synthesis', 'ir'].includes(lesson.id);
 
   const cancelGuidedTransition = () => {
     if (guidedTransitionRef.current) cancelAnimationFrame(guidedTransitionRef.current);
@@ -374,6 +387,22 @@ export default function App() {
                 <small className="habit-y">above ice saturation</small>
               </div>
               <div className="habit-axis"><span>-25 °C</span><span>-2 °C</span></div>
+            </div>
+          )}
+          {lesson.id === 'ir' && (
+            <div className="concept-inset ir-inset" aria-label="Infrared transmittance spectrum of CO2">
+              <strong>IR spectrum · CO₂</strong><span>dips = absorption · scan bar tracks the beam</span>
+              <svg viewBox="0 0 200 100" role="img" aria-label="CO2 infrared spectrum: strong peak at 2349, weaker at 667, and a silent gap at 1340">
+                <path className="axis" d="M8 80 H192" />
+                <polyline className="ir-trace" points="8,26 84,26 92,68 100,26 170,26 178,62 186,26 192,26" />
+                <line className="ir-silent" x1="144" y1="26" x2="144" y2="36" />
+                <line className="ir-cursor" x1={8 + progress * 184} y1="14" x2={8 + progress * 184} y2="80" />
+                <text className="ir-peak" x="92" y="80">2349</text>
+                <text className="ir-peak silent" x="144" y="44">1340 silent</text>
+                <text className="ir-peak" x="178" y="80">667</text>
+                <text className="ir-axis-end" x="8" y="94">4000</text>
+                <text className="ir-axis-end end" x="192" y="94">400 cm⁻¹</text>
+              </svg>
             </div>
           )}
 
