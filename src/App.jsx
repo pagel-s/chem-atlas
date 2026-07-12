@@ -7,6 +7,7 @@ import {
 import ChemScene from './ChemScene';
 import { lessons as allLessons } from './lessons';
 import { mechanismSpecs } from './mechanismSpecs';
+import { techniqueSpecs } from './techniqueSpecs';
 
 const MoleculeScene = lazy(() => import('./MoleculeScene'));
 
@@ -16,8 +17,8 @@ const lessons = allLessons.filter((lesson) => lesson.id !== 'synthesis');
 const icons = {
   battery: BatteryCharging, binding: Focus, snowflake: Snowflake, catalyst: Hexagon,
   smell: Waves, mechanism: Play, orbitals: CircleDot, geometry: Atom,
-  lattice: Box, electrochem: FlaskConical, synthesis: FlaskConical, ir: Activity,
-  raman: Zap, uvvis: Palette, nmr: Magnet, massspec: Scale, xrd: Layers, fluorescence: Lightbulb,
+  lattice: Box, electrochem: FlaskConical, synthesis: FlaskConical,
+  analysis: Activity,
 };
 
 const guidedViews = {
@@ -32,13 +33,6 @@ const guidedViews = {
   lattice: [{ progress: 0, part: 'Unit cell' }, { progress: .5, part: 'Coordination shell' }, { progress: .5, part: 'Central cation' }, { progress: 1, part: 'Cleavage plane' }],
   electrochem: [{ progress: 0, part: 'Anode' }, { progress: .35, part: 'Anode' }, { progress: .7, part: 'Cathode' }, { progress: 1, part: 'Salt bridge' }],
   synthesis: [{ progress: .04, part: 'Condition' }, { progress: .34, part: 'Manual flask' }, { progress: .68, part: 'Reaction plate' }, { progress: .96, part: 'Candidate condition' }],
-  ir: [{ progress: .06, part: 'Oxygen' }, { progress: .459, part: 'Dipole moment' }, { progress: .739, part: 'Dipole moment' }, { progress: .926, part: 'Dipole moment' }],
-  raman: [{ progress: .05, part: 'Laser' }, { progress: .447, part: 'Polarisability' }, { progress: .783, part: 'Polarisability' }, { progress: .447, part: 'Stokes photon' }],
-  uvvis: [{ progress: .02, part: 'Photon' }, { progress: .108, part: 'HOMO-LUMO gap' }, { progress: .108, part: 'Conjugated chain' }, { progress: .33, part: 'Electron' }],
-  nmr: [{ progress: .05, part: 'B0 field' }, { progress: .63, part: 'CH2 protons' }, { progress: .88, part: 'CH3 protons' }, { progress: .63, part: 'CH2 protons' }],
-  massspec: [{ progress: .767, part: 'Detector' }, { progress: .25, part: 'CH3 fragment' }, { progress: .517, part: 'CH2OH fragment' }, { progress: .767, part: 'Detector' }],
-  xrd: [{ progress: .08, part: 'Lattice planes' }, { progress: .342, part: 'X-ray beam' }, { progress: .52, part: 'X-ray beam' }, { progress: .74, part: 'Detector spot' }],
-  fluorescence: [{ progress: .25, part: 'Absorbed photon' }, { progress: .5, part: 'Electron' }, { progress: .75, part: 'Emitted photon' }, { progress: .92, part: 'Emitted photon' }],
 };
 
 const sceneLegends = {
@@ -53,13 +47,6 @@ const sceneLegends = {
   lattice: ['Na+ (smaller cation)', 'Cl- (larger anion)', 'coordination = 6', 'flat cleavage plane'],
   electrochem: ['Zn(s) -> Zn2+ + 2e-', 'Cu2+ + 2e- -> Cu(s)', 'NO3- -> zinc anode', 'K+ -> copper cathode'],
   synthesis: ['one generic reaction question', 'manual serial flask', 'independent plate wells', 'illustrative analytical response'],
-  ir: ['C=O bonds', 'net dipole (gold arrow)', 'absorption peak', 'IR-silent mode'],
-  raman: ['laser in (unshifted)', 'Stokes photon (shifted)', 'electron cloud = polarisability', 'Raman-silent mode'],
-  uvvis: ['conjugated chain', 'HOMO / LUMO levels', 'promoted electron', 'absorbed wavelength'],
-  nmr: ['B0 field', 'CH3 (most shielded)', 'CH2 (deshielded by O)', 'OH'],
-  massspec: ['molecular ion M+', 'fragment', 'detector', 'selected m/z'],
-  xrd: ['lattice planes', 'X-ray beams', 'path difference 2d·sinθ', 'bright Bragg spot'],
-  fluorescence: ['absorbed photon (blue)', 'emitted photon (green)', 'vibrational relaxation', 'Stokes shift'],
 };
 
 const observationPrompts = {
@@ -74,13 +61,6 @@ const observationPrompts = {
   lattice: ['This one cube, repeated in every direction, is the whole crystal.', 'Find the central Na+ and count its six Cl- neighbours.', 'Rotate the octahedron: six nearest neighbours, one on each axis.', 'Watch the crystal lift apart along a flat plane into two even faces.'],
   electrochem: ['Start with the switch open: a potential difference is not a sustained current.', 'Close the switch and follow one Zn atom into solution with two electrons.', 'Follow the same two electrons to one Cu2+ ion as it deposits on copper.', 'Track two NO3- to the zinc side and two K+ to the copper side as charge is compensated.'],
   synthesis: ['Read the generic amide question before choosing a workflow.', 'Follow one measured manual dispensing step into a single planned flask.', 'Inspect the 4 x 6 plate: distinguish conditions, a replicate, and a blank control.', 'Treat the highlighted well as a candidate for verification, not a finished scalable procedure.'],
-  ir: ['Scan the beam; the molecule only reacts near one of its vibration frequencies.', 'At 2349 cm⁻¹ the two C=O stretch out of step — the gold dipole arrow flips, so it absorbs.', 'At 1340 cm⁻¹ the molecule breathes symmetrically — the dipole stays zero and no peak appears.', 'At 667 cm⁻¹ the molecule bends — a dipole appears and it absorbs again.'],
-  raman: ['One fixed laser colour goes in; watch what comes back out.', 'At 1340 cm⁻¹ the electron cloud swells and shrinks — a Stokes photon leaves and a peak appears.', 'At 2349 cm⁻¹ the cloud shifts but never changes size, so nothing is scattered inelastically.', 'Compare with the IR exhibit: every mode is in one spectrum or the other, never both.'],
-  uvvis: ['Most wavelengths pass straight through the sample.', 'Stop at λmax: the electron jumps the gap and that wavelength is absorbed.', 'Raise the conjugation control and watch the gap — and λmax — move.', 'Push conjugation far enough and the absorption reaches the visible.'],
-  nmr: ['The field is on; every proton is waiting at its own frequency.', 'At 3.7 ppm the CH2 protons light up — oxygen has stripped their shielding.', 'At 1.2 ppm the CH3 protons resonate, shielded and upfield.', 'Read the peak areas: 3 : 2 : 1 counts the hydrogens exactly.'],
-  massspec: ['At m/z 46 the whole molecule gets through: that is the molecular mass.', 'At m/z 15 only the methyl end reaches the detector.', 'At m/z 31 the CH2OH end gets through — the tallest peak in the spectrum.', 'The molecular ion gives the mass; the fragments give the structure.'],
-  xrd: ['Two planes, two reflections — the deeper wave travels further.', 'At the first Bragg angle the extra path is one wavelength and the spot lights up.', 'In between, the waves cancel and the detector goes dark.', 'A second spot appears where the extra path is two wavelengths.'],
-  fluorescence: ['A blue photon arrives and lifts the electron to S1.', 'Watch it slide down the vibrational ladder — that energy is lost as heat.', 'It drops back to S0 from lower down, so the photon it emits is weaker.', 'The gap between absorbed and emitted light is the Stokes shift.'],
 };
 
 function snowHabit(temperature, saturation) {
@@ -137,100 +117,63 @@ function sceneReadout(id, progress, parameters = {}, mechanismId = 'sn2') {
     lattice: [['Structure', 'rock salt (NaCl)'], ['Coordination', '6 : 6, octahedral'], ['View', progress < .34 ? 'one unit cell' : progress < .67 ? 'one ion + 6 neighbours' : 'cleaving along a flat plane']],
     electrochem: [['Circuit state', circuitClosed ? 'closed: Zn -> wire -> Cu' : 'open: no sustained current'], ['Redox event', electrochemProgress < .18 ? 'ready: no net transfer' : electrochemProgress < .6 ? 'Zn(s) -> Zn2+(aq) + 2e-' : electrochemProgress < .8 ? 'Cu2+(aq) + 2e- -> Cu(s)' : 'one paired Zn/Cu event'], ['Electrode mass', electrochemProgress < .18 ? 'unchanged' : electrochemProgress < .6 ? 'Zn down; Cu unchanged' : electrochemProgress < .76 ? 'Zn down; Cu depositing' : 'Zn down; Cu up'], ['Charge compensation', electrochemProgress < .58 ? 'bridge awaits imbalance' : electrochemProgress < .94 ? '2 NO3- -> anode; 2 K+ -> cathode' : 'both half-cells rebalanced']],
     synthesis: [['Workflow stage', progress < .16 ? 'one defined reaction question' : progress < .48 ? 'manual serial flask' : progress < .8 ? 'parallel 24-well condition screen' : 'analyse -> choose -> verify'], ['Reaction identity', 'ArCO2H + RNH2 + coupling reagent -> ArCONHR'], ['Parallel unit', progress < .48 ? 'one planned condition' : 'independent wells, not one mixture'], ['Result status', progress < .8 ? 'no result before analysis' : 'candidate condition; verify at scale']],
-    ir: (() => {
-      const wn = Math.round(4000 - progress * 3600);
-      const near = [{ p: .459, name: 'asymmetric stretch', active: true }, { p: .739, name: 'symmetric stretch', active: false }, { p: .926, name: 'bend', active: true }].find((m) => Math.abs(progress - m.p) < .06);
-      return [
-        ['IR wavenumber', `${wn} cm⁻¹`],
-        ['At this frequency', near ? near.name : 'no vibration (scanning)'],
-        ['Dipole change', near ? (near.active ? 'yes' : 'no (stays symmetric)') : '—'],
-        ['Result', near ? (near.active ? 'absorbs -> peak' : 'IR-silent -> no peak') : 'light passes through'],
-      ];
-    })(),
-    raman: (() => {
-      const shift = Math.round(progress * 3000);
-      const near = [{ p: .222, name: 'bend', active: false }, { p: .447, name: 'symmetric stretch', active: true }, { p: .783, name: 'asymmetric stretch', active: false }].find((m) => Math.abs(progress - m.p) < .06);
-      return [
-        ['Raman shift', `${shift} cm⁻¹`],
-        ['At this shift', near ? near.name : 'no vibration (scanning)'],
-        ['Polarisability change', near ? (near.active ? 'yes (cloud breathes)' : 'no (size fixed)') : '—'],
-        ['Result', near ? (near.active ? 'Stokes photon -> peak' : 'Raman-silent (IR-active)') : 'only Rayleigh scattering'],
-      ];
-    })(),
-    uvvis: (() => {
-      const n = Math.round(parameters.conjugation ?? 3);
-      const lambda = Math.round(200 + progress * 500);
-      const lambdaMax = Math.round(217 + 37 * (n - 2));
-      const hit = Math.abs(lambda - lambdaMax) < 14;
-      return [
-        ['Wavelength', `${lambda} nm`],
-        ['Conjugated C=C', `${n}`],
-        ['λmax (HOMO-LUMO gap)', `${lambdaMax} nm`],
-        ['Result', hit ? 'electron promoted -> absorbs' : 'photon passes through'],
-      ];
-    })(),
-    nmr: (() => {
-      const ppm = (10 - progress * 10).toFixed(1);
-      const near = [{ p: .63, name: 'CH2', n: '2H', mult: 'quartet' }, { p: .74, name: 'OH', n: '1H', mult: 'singlet' }, { p: .88, name: 'CH3', n: '3H', mult: 'triplet' }].find((m) => Math.abs(progress - m.p) < .04);
-      return [
-        ['Chemical shift', `${ppm} ppm`],
-        ['Resonating', near ? near.name : 'nothing (scanning)'],
-        ['Integration', near ? near.n : '—'],
-        ['Splitting (n+1)', near ? near.mult : '—'],
-      ];
-    })(),
-    massspec: (() => {
-      const mz = Math.round(progress * 60);
-      const near = [{ p: .25, mz: 15, id: 'CH3+ (methyl end)' }, { p: .517, mz: 31, id: 'CH2OH+ (base peak)' }, { p: .75, mz: 45, id: 'M-H' }, { p: .767, mz: 46, id: 'M+ (molecular ion)' }].find((m) => Math.abs(progress - m.p) < .022);
-      return [
-        ['Selected m/z', `${mz}`],
-        ['Reaches detector', near ? near.id : 'nothing at this mass'],
-        ['Molecular mass', '46 (ethanol)'],
-        ['Base peak', 'm/z 31'],
-      ];
-    })(),
-    xrd: (() => {
-      const theta = progress * 60;
-      const phase = Math.sin(theta * Math.PI / 180) / .35;
-      const intensity = Math.pow(Math.cos(Math.PI * phase), 2);
-      const bright = intensity > .82 && progress > .06;
-      return [
-        ['Angle θ', `${theta.toFixed(1)}°`],
-        ['Path difference', `${phase.toFixed(2)} λ`],
-        ['Waves arrive', bright ? 'in phase' : 'out of phase'],
-        ['Detector', bright ? 'bright spot (Bragg)' : 'dark'],
-      ];
-    })(),
-    fluorescence: [
-      ['Stage', progress < .36 ? 'absorbing a photon' : progress < .64 ? 'vibrational relaxation (heat)' : 'emitting a photon'],
-      ['Electron', progress < .36 ? 'S0 -> S1' : progress < .64 ? 'sliding down S1' : 'S1 -> S0'],
-      ['Energy lost as heat', progress < .36 ? 'none yet' : 'yes, before emission'],
-      ['Emitted photon', progress < .64 ? '—' : 'lower energy than absorbed'],
-    ],
   };
   return values[id];
 }
 
-// Shared spectrum panel for the analytical exhibits: upward peaks on a swept axis, with an
-// optional cursor tracking the probe and dashed marks for signals this technique cannot see.
-function PeakSpectrum({ title, subtitle, cursor, peaks = [], marks = [], band = [], left, right, ariaLabel }) {
+// One spectrum panel, driven entirely by the active technique's spec. It renders either a
+// transmittance trace (dips = absorption, for IR) or upward peaks, plus dashed marks for
+// signals the technique is blind to, an optional integral trace, and multiplet expansions.
+function SpectrumPanel({ spec, cursor }) {
+  if (!spec) return null;
   const px = (p) => 8 + p * 184;
-  const baseY = 74;
-  const shape = (list) => list.map((pk) => `M${px(pk.x) - 6} ${baseY} L${px(pk.x)} ${baseY - pk.h * 50} L${px(pk.x) + 6} ${baseY}`).join(' ');
+  const base = 74;
+  const topT = 26;
+  const isT = spec.kind === 'transmittance';
+  const peaks = spec.peaks || [];
+  const marks = spec.marks || [];
+  const band = spec.band || [];
+  const up = (list) => list.map((pk) => `M${px(pk.x) - 5} ${base} L${px(pk.x)} ${base - pk.h * 46} L${px(pk.x) + 5} ${base}`).join(' ');
+  const dips = (list) => {
+    let d = `M8 ${topT}`;
+    [...list].sort((a, b) => a.x - b.x).forEach((pk) => {
+      d += ` L${px(pk.x) - 6} ${topT} L${px(pk.x)} ${topT + pk.h * 42} L${px(pk.x) + 6} ${topT}`;
+    });
+    return `${d} L192 ${topT}`;
+  };
+  const integralPath = (steps) => {
+    const y = (h) => 96 - h * 22;
+    let prev = 0;
+    let d = `M8 ${y(0)}`;
+    [...steps].sort((a, b) => a.x - b.x).forEach((st) => {
+      d += ` L${px(st.x) - 4} ${y(prev)} L${px(st.x) + 4} ${y(st.h)}`;
+      prev = st.h;
+    });
+    return `${d} L192 ${y(prev)}`;
+  };
+  const showCursor = !spec.noCursor && cursor !== null && cursor !== undefined;
   return (
-    <div className="concept-inset peak-inset" aria-label={ariaLabel}>
-      <strong>{title}</strong><span>{subtitle}</span>
-      <svg viewBox="0 0 200 100" role="img" aria-label={ariaLabel}>
-        <path className="axis" d={`M8 ${baseY} H192`} />
-        {band.length > 0 && <path className="peak-b" d={shape(band)} />}
-        <path className="peak-a" d={shape(peaks)} />
-        {marks.map((m) => <line key={`l-${m.label}`} className="peak-mark" x1={px(m.x)} y1={baseY} x2={px(m.x)} y2={baseY - 13} />)}
-        {cursor !== null && cursor !== undefined && <line className="ir-cursor" x1={px(cursor)} y1="12" x2={px(cursor)} y2={baseY} />}
-        {peaks.filter((pk) => pk.label).map((pk) => <text key={`t-${pk.label}`} className="ir-peak" x={px(pk.x)} y={baseY - pk.h * 50 - 4}>{pk.label}</text>)}
-        {band.filter((pk) => pk.label).map((pk) => <text key={`b-${pk.label}`} className="ir-peak band" x={px(pk.x)} y={baseY - pk.h * 50 - 4}>{pk.label}</text>)}
-        {marks.map((m) => <text key={`mt-${m.label}`} className="ir-peak silent" x={px(m.x)} y={baseY - 17}>{m.label}</text>)}
-        <text className="ir-axis-end" x="8" y="92">{left}</text>
-        <text className="ir-axis-end end" x="192" y="92">{right}</text>
+    <div className="concept-inset peak-inset" aria-label={spec.title}>
+      <strong>{spec.title}</strong><span>{spec.subtitle}</span>
+      <svg viewBox="0 0 200 112" role="img" aria-label={spec.title}>
+        <path className="axis" d={`M8 ${isT ? 70 : base} H192`} />
+        {spec.integral && <path className="spec-integral" d={integralPath(spec.integral)} />}
+        {band.length > 0 && <path className="peak-b" d={up(band)} />}
+        <path className={isT ? 'ir-trace' : 'peak-a'} d={isT ? dips(peaks) : up(peaks)} />
+        {marks.map((m) => <line key={`l-${m.label}`} className="peak-mark" x1={px(m.x)} y1={isT ? topT : base} x2={px(m.x)} y2={isT ? topT + 12 : base - 12} />)}
+        {peaks.filter((pk) => pk.mult).map((pk) => (
+          <g key={`m-${pk.label}`}>
+            {Array.from({ length: pk.mult }).map((_, i) => (
+              <line key={i} className="spec-mult" x1={px(pk.x) - (pk.mult - 1) * 1.6 + i * 3.2} y1={base - pk.h * 46 - 6} x2={px(pk.x) - (pk.mult - 1) * 1.6 + i * 3.2} y2={base - pk.h * 46 - 12} />
+            ))}
+          </g>
+        ))}
+        {showCursor && <line className="ir-cursor" x1={px(cursor)} y1="12" x2={px(cursor)} y2={isT ? 70 : base} />}
+        {peaks.filter((pk) => pk.label).map((pk) => <text key={`t-${pk.label}`} className="ir-peak" x={px(pk.x)} y={isT ? topT + pk.h * 42 + 8 : base - pk.h * 46 - 15}>{pk.label}</text>)}
+        {band.filter((pk) => pk.label).map((pk) => <text key={`b-${pk.label}`} className="ir-peak band" x={px(pk.x)} y={base - pk.h * 46 - 4}>{pk.label}</text>)}
+        {marks.map((m) => <text key={`mt-${m.label}`} className="ir-peak silent" x={px(m.x)} y={isT ? topT + 20 : base - 16}>{m.label}</text>)}
+        <text className="ir-axis-end" x="8" y="108">{spec.left}</text>
+        <text className="ir-axis-end end" x="192" y="108">{spec.right}</text>
       </svg>
     </div>
   );
@@ -254,23 +197,28 @@ export default function App() {
   const [freeExplore, setFreeExplore] = useState(false);
   const [guidedTransitioning, setGuidedTransitioning] = useState(false);
   const [mechanismId, setMechanismId] = useState('sn2');
+  const [techniqueId, setTechniqueId] = useState('ir');
   const progressRef = useRef(0);
   const guidedTransitionRef = useRef();
   const baseLesson = lessons[lessonIndex];
   const activeMechanism = baseLesson.id === 'mechanism'
     ? mechanismSpecs.find((spec) => spec.id === mechanismId) || mechanismSpecs[0]
     : null;
-  const lesson = activeMechanism ? { ...baseLesson, ...activeMechanism, id: baseLesson.id } : baseLesson;
+  const activeTechnique = baseLesson.id === 'analysis'
+    ? techniqueSpecs.find((spec) => spec.id === techniqueId) || techniqueSpecs[0]
+    : null;
+  const activeVariant = activeMechanism || activeTechnique;
+  const lesson = activeVariant ? { ...baseLesson, ...activeVariant, id: baseLesson.id } : baseLesson;
   const LessonIcon = icons[lesson.id];
-  const guidedSequence = activeMechanism?.guidedViews || guidedViews[lesson.id];
-  const lessonLegend = activeMechanism?.legend || sceneLegends[lesson.id];
-  const lessonSwatches = activeMechanism?.swatches;
-  const lessonObservations = activeMechanism?.observationPrompts || observationPrompts[lesson.id];
-  const lessonKey = activeMechanism ? `${lesson.id}:${activeMechanism.id}` : lesson.id;
+  const guidedSequence = activeVariant?.guidedViews || guidedViews[lesson.id];
+  const lessonLegend = activeVariant?.legend || sceneLegends[lesson.id];
+  const lessonSwatches = activeVariant?.swatches;
+  const lessonObservations = activeVariant?.observationPrompts || observationPrompts[lesson.id];
+  const lessonKey = activeVariant ? `${lesson.id}:${activeVariant.id}` : lesson.id;
   const catalystScaleStage = progress < .2 ? 0 : progress < .48 ? 1 : progress < .62 ? 2 : 3;
   const guidedView = guidedSequence[Math.min(stepIndex, lesson.steps.length - 1)];
   const highlightedPart = selectedPart || (freeExplore ? null : guidedView.part);
-  const hasContinuousControl = ['battery', 'snowflake', 'catalyst', 'mechanism', 'electrochem', 'synthesis', 'ir', 'raman', 'uvvis', 'nmr', 'massspec', 'xrd', 'fluorescence'].includes(lesson.id);
+  const hasContinuousControl = ['battery', 'snowflake', 'catalyst', 'mechanism', 'electrochem', 'synthesis', 'analysis'].includes(lesson.id);
 
   const cancelGuidedTransition = () => {
     if (guidedTransitionRef.current) cancelAnimationFrame(guidedTransitionRef.current);
@@ -311,7 +259,7 @@ export default function App() {
     setPlaying(false);
     setFreeExplore(false);
     if (lesson.id === 'battery') setBatteryRate(stepIndex === 3 ? 1.7 : .3);
-    if (lesson.id === 'uvvis') setConjugation(stepIndex === 3 ? 6 : 3);
+    if (activeTechnique?.stepConjugation) setConjugation(activeTechnique.stepConjugation[stepIndex] ?? 2);
     if (lesson.id === 'electrochem' && stepIndex > 0) setElectrochemClosed(true);
     if (distance < .002) {
       setVisualProgress(target);
@@ -385,6 +333,14 @@ export default function App() {
     setStepIndex(0);
     setMechanismId(id);
   };
+  const chooseTechnique = (id) => {
+    if (id === techniqueId) return;
+    cancelGuidedTransition();
+    setPlaying(false); setFreeExplore(false); setSelectedPart(null); setAnswer(null);
+    progressRef.current = 0; setProgress(0); setStepIndex(0);
+    setConjugation(2);
+    setTechniqueId(id);
+  };
   const moveStep = (direction) => {
     if (direction > 0 && stepIndex === lesson.steps.length - 1 && guidedTransitioning) return;
     setStepIndex((current) => Math.max(0, Math.min(lesson.steps.length, current + direction)));
@@ -439,7 +395,7 @@ export default function App() {
               <MoleculeScene key={lesson.id} kind={lesson.id} progress={progress} stepIndex={stepIndex} resetToken={cameraReset} selectedPart={highlightedPart} onSelect={(part) => { setFreeExplore(true); setSelectedPart(part); }} />
             </Suspense>
           ) : (
-            <ChemScene lessonId={lesson.id} sceneVariant={activeMechanism?.id} progress={progress} progressSignal={progressRef} stepIndex={stepIndex} resetToken={cameraReset} parameters={{ temperature: snowTemperature, saturation: snowSaturation, chargeRate: batteryRate, conjugation, circuitClosed: electrochemClosed, circuitFrozenProgress: electrochemFrozenProgress, mechanismId: activeMechanism?.id }} color={lesson.color} selectedPart={highlightedPart} onSelect={(part) => { setFreeExplore(true); setSelectedPart(part); }} />
+            <ChemScene lessonId={lesson.id} sceneVariant={activeVariant?.id} progress={progress} progressSignal={progressRef} stepIndex={stepIndex} resetToken={cameraReset} parameters={{ temperature: snowTemperature, saturation: snowSaturation, chargeRate: batteryRate, conjugation, circuitClosed: electrochemClosed, circuitFrozenProgress: electrochemFrozenProgress, mechanismId: activeMechanism?.id, techniqueId: activeTechnique?.id }} color={lesson.color} selectedPart={highlightedPart} onSelect={(part) => { setFreeExplore(true); setSelectedPart(part); }} />
           )}
 
           <div className="scene-legend" aria-label="Model legend">
@@ -456,7 +412,9 @@ export default function App() {
             </div>
           )}
           <div className={`scene-readout readout-${lesson.id}`} aria-label="Scientific readout">
-            {sceneReadout(lesson.id, progress, { temperature: snowTemperature, saturation: snowSaturation, chargeRate: batteryRate, conjugation, circuitClosed: electrochemClosed, circuitFrozenProgress: electrochemFrozenProgress }, activeMechanism?.id).map(([label, value], index) => <div key={`${label}-${index}`}><span>{label}</span><strong>{value}</strong></div>)}
+            {(activeTechnique
+              ? activeTechnique.readout(progress, { conjugation })
+              : sceneReadout(lesson.id, progress, { temperature: snowTemperature, saturation: snowSaturation, chargeRate: batteryRate, conjugation, circuitClosed: electrochemClosed, circuitFrozenProgress: electrochemFrozenProgress }, activeMechanism?.id)).map(([label, value], index) => <div key={`${label}-${index}`}><span>{label}</span><strong>{value}</strong></div>)}
           </div>
           {lesson.id === 'binding' && stepIndex === 3 && (
             <div className="concept-inset" aria-label="Receptor occupancy model">
@@ -495,71 +453,8 @@ export default function App() {
               <div className="habit-axis"><span>-25 °C</span><span>-2 °C</span></div>
             </div>
           )}
-          {lesson.id === 'ir' && (
-            <div className="concept-inset ir-inset" aria-label="Infrared transmittance spectrum of CO2">
-              <strong>IR spectrum · CO₂</strong><span>dips = absorption · scan bar tracks the beam</span>
-              <svg viewBox="0 0 200 100" role="img" aria-label="CO2 infrared spectrum: strong peak at 2349, weaker at 667, and a silent gap at 1340">
-                <path className="axis" d="M8 80 H192" />
-                <polyline className="ir-trace" points="8,26 84,26 92,68 100,26 170,26 178,62 186,26 192,26" />
-                <line className="ir-silent" x1="144" y1="26" x2="144" y2="36" />
-                <line className="ir-cursor" x1={8 + progress * 184} y1="14" x2={8 + progress * 184} y2="80" />
-                <text className="ir-peak" x="92" y="80">2349</text>
-                <text className="ir-peak silent" x="144" y="44">1340 silent</text>
-                <text className="ir-peak" x="178" y="80">667</text>
-                <text className="ir-axis-end" x="8" y="94">4000</text>
-                <text className="ir-axis-end end" x="192" y="94">400 cm⁻¹</text>
-              </svg>
-            </div>
-          )}
-          {lesson.id === 'raman' && (
-            <PeakSpectrum
-              title="Raman spectrum · CO₂" subtitle="shift = vibrational energy given to the molecule"
-              cursor={progress} left="0" right="3000 cm⁻¹"
-              peaks={[{ x: .447, h: 1, label: '1340' }]}
-              marks={[{ x: .222, label: '667 IR only' }, { x: .783, label: '2349 IR only' }]}
-              ariaLabel="Raman spectrum of CO2: one peak at 1340; the IR-active modes are silent"
-            />
-          )}
-          {lesson.id === 'uvvis' && (
-            <PeakSpectrum
-              title="UV-Vis absorption" subtitle="λmax slides right as conjugation grows"
-              cursor={progress} left="200" right="700 nm"
-              peaks={[{ x: (217 + 37 * (conjugation - 2) - 200) / 500, h: 1, label: `${Math.round(217 + 37 * (conjugation - 2))} nm` }]}
-              ariaLabel="UV-Vis absorption spectrum with lambda max set by the conjugation length"
-            />
-          )}
-          {lesson.id === 'nmr' && (
-            <PeakSpectrum
-              title="¹H NMR · ethanol" subtitle="peak area counts the hydrogens"
-              cursor={progress} left="10 ppm" right="0 ppm"
-              peaks={[{ x: .63, h: .72, label: 'CH₂ 2H' }, { x: .74, h: .4, label: 'OH 1H' }, { x: .88, h: 1, label: 'CH₃ 3H' }]}
-              ariaLabel="Proton NMR of ethanol showing CH2, OH and CH3 signals with 2 to 1 to 3 integration"
-            />
-          )}
-          {lesson.id === 'massspec' && (
-            <PeakSpectrum
-              title="Mass spectrum · ethanol" subtitle="each peak is a fragment that reached the detector"
-              cursor={progress} left="m/z 0" right="60"
-              peaks={[{ x: .25, h: .35, label: '15' }, { x: .517, h: 1, label: '31' }, { x: .75, h: .38 }, { x: .767, h: .55, label: '46 M⁺' }]}
-              ariaLabel="Mass spectrum of ethanol with base peak at m z 31 and molecular ion at 46"
-            />
-          )}
-          {lesson.id === 'xrd' && (
-            <PeakSpectrum
-              title="Diffraction pattern" subtitle="bright only where 2d·sinθ = n·λ"
-              cursor={progress} left="θ 0°" right="60°"
-              peaks={[{ x: .342, h: 1, label: 'n=1' }, { x: .74, h: .72, label: 'n=2' }]}
-              ariaLabel="Diffraction intensity against angle, with Bragg reflections at n equals 1 and 2"
-            />
-          )}
-          {lesson.id === 'fluorescence' && (
-            <PeakSpectrum
-              title="Absorption & emission" subtitle="the gap between them is the Stokes shift"
-              cursor={null} left="higher energy" right="lower energy"
-              band={[{ x: .32, h: .9, label: 'absorbed' }]}
-              peaks={[{ x: .66, h: .78, label: 'emitted' }]}
-              ariaLabel="Absorption band at higher energy and emission band at lower energy, separated by the Stokes shift"
-            />
+          {activeTechnique && (
+            <SpectrumPanel spec={activeTechnique.spectrum({ conjugation })} cursor={progress} />
           )}
 
           <div className="scene-instruction"><Rotate3D size={16} /> Drag to rotate <span /> <MousePointer2 size={15} /> Select a structure <span /> <button onClick={() => setCameraReset((value) => value + 1)}><RotateCcw size={15} /> Reset view</button></div>
@@ -571,6 +466,13 @@ export default function App() {
                   <div className="mechanism-picker" role="group" aria-label="Reaction mechanism">
                     {mechanismSpecs.map((spec) => (
                       <button key={spec.id} aria-pressed={spec.id === activeMechanism?.id} title={spec.title} onClick={() => chooseMechanism(spec.id)}>{spec.label}</button>
+                    ))}
+                  </div>
+                )}
+                {lesson.id === 'analysis' && (
+                  <div className="mechanism-picker technique-picker" role="group" aria-label="Analytical technique">
+                    {techniqueSpecs.map((spec) => (
+                      <button key={spec.id} aria-pressed={spec.id === activeTechnique?.id} title={spec.title} onClick={() => chooseTechnique(spec.id)}>{spec.label}</button>
                     ))}
                   </div>
                 )}
@@ -604,7 +506,7 @@ export default function App() {
                     <label><span>Illustrative charge rate</span><strong>{batteryRate.toFixed(1)} C</strong><input style={{ '--value': `${((batteryRate - .2) / 1.8) * 100}%` }} aria-label="Illustrative battery charge rate in C" type="range" min="0.2" max="2" step="0.1" value={batteryRate} onChange={(event) => { setFreeExplore(true); setBatteryRate(Number(event.target.value)); }} /></label>
                   </div>
                 )}
-                {lesson.id === 'uvvis' && (
+                {activeTechnique?.id === 'uvvis' && (
                   <div className="parameter-grid one-parameter">
                     <label><span>Conjugated C=C double bonds</span><strong>{conjugation}</strong><input style={{ '--value': `${((conjugation - 2) / 4) * 100}%` }} aria-label="Number of conjugated double bonds" type="range" min="2" max="6" step="1" value={conjugation} onChange={(event) => { setFreeExplore(true); setConjugation(Number(event.target.value)); }} /></label>
                   </div>

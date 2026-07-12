@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { lessons } from '../src/lessons.js';
 import { mechanismSpecs } from '../src/mechanismSpecs.js';
+import { techniqueSpecs, POLYENE } from '../src/techniqueSpecs.js';
 
 const app = readFileSync(new URL('../src/App.jsx', import.meta.url), 'utf8');
 const scene = readFileSync(new URL('../src/ChemScene.jsx', import.meta.url), 'utf8');
@@ -12,19 +13,65 @@ const assert = (condition, message) => {
   if (!condition) throw new Error(message);
 };
 
-assert(lessons.length === 18, 'Expected eighteen chemistry exhibits.');
-// The analytical suite: each technique needs a scene, a spectrum panel, and its parts.
+assert(lessons.length === 12, 'Expected twelve exhibits (the analytical techniques live in one lesson).');
+const analysis = lessons.find((lesson) => lesson.id === 'analysis');
+assert(analysis && scene.includes('function analysisExhibit') && app.includes("lesson.id === 'analysis'"), 'The analytical techniques must be one lesson with a technique picker.');
+
+// --- Analytical techniques: the science has to be defensible, so lock the real values in.
+assert(techniqueSpecs.length === 7, 'Expected seven analytical techniques.');
 ['ir', 'raman', 'uvvis', 'nmr', 'massspec', 'xrd', 'fluorescence'].forEach((id) => {
-  const lesson = lessons.find((item) => item.id === id);
-  assert(lesson && lesson.category === 'Analytical techniques', `Analytical exhibit missing: ${id}.`);
-  assert(app.includes(`lesson.id === '${id}'`), `${id}: spectrum panel is not wired into the stage.`);
-  assert(app.includes(`${id}:`), `${id}: missing from the App per-lesson maps.`);
+  const spec = techniqueSpecs.find((t) => t.id === id);
+  assert(spec, `Missing technique: ${id}.`);
+  assert(spec.steps.length === 4 && spec.guidedViews.length === 4, `${id}: expected four guided states.`);
+  assert(spec.check.options.length === 3 && spec.check.explanation?.length > 30, `${id}: assessment needs evidence-based feedback.`);
+  assert(typeof spec.readout === 'function' && typeof spec.spectrum === 'function', `${id}: needs a readout and a spectrum.`);
+  assert(spec.evidence.length > 120, `${id}: evidence note must state the model's limits.`);
+  spec.guidedViews.forEach((v) => assert(spec.parts[v.part], `${id}: guided view references undefined part ${v.part}.`));
 });
-const irLesson = lessons.find((lesson) => lesson.id === 'ir');
-const ramanLesson = lessons.find((lesson) => lesson.id === 'raman');
-assert(irLesson.parts['Dipole moment'] && ramanLesson.parts.Polarisability, 'IR and Raman must expose their different selection rules.');
-// Mutual exclusion must fall out of the shared geometry, not be asserted by hand.
-assert(scene.includes('function co2State') && scene.includes('mu: sum.clone().multiplyScalar(-1)') && scene.includes('polar: (rL + rR) / (2 * CO2_L)'), 'CO2 dipole and polarisability must be derived from one shared normal-mode geometry.');
+
+// IR/Raman mutual exclusion must fall out of one shared geometry, not be asserted by hand.
+assert(scene.includes('function co2State') && scene.includes('mu: sum.clone().multiplyScalar(-1)') && scene.includes('polar: (rL + rR) / (2 * CO2_L)'), 'CO2 dipole and polarisability must both be derived from one normal-mode geometry.');
+
+// CO2: v1 is IR-silent, and in Raman it is a FERMI DOUBLET (1285/1388), not a single line.
+const ir = techniqueSpecs.find((t) => t.id === 'ir');
+const raman = techniqueSpecs.find((t) => t.id === 'raman');
+const irSpec = ir.spectrum();
+const ramanSpec = raman.spectrum();
+assert(irSpec.marks.some((m) => m.label.includes('1333')), 'IR must show v1 (1333) as a silent mark, not a band.');
+assert(!irSpec.peaks.some((p) => Math.abs(p.x - (4000 - 1333) / 3600) < .01), 'IR must have NO band at the symmetric stretch.');
+assert(ramanSpec.peaks.length === 2, 'CO2 Raman v1 is a Fermi doublet: it must be two peaks, not one.');
+assert(raman.evidence.includes('Fermi resonance') && raman.evidence.includes('1285') && raman.evidence.includes('1388'), 'Raman must disclose the Fermi-resonance doublet.');
+
+// UV-Vis must use tabulated polyene data, not a fitted straight line.
+assert(POLYENE[2].lambdaMax === 217 && POLYENE[3].lambdaMax === 258 && POLYENE[6].lambdaMax === 364, 'Polyene lambda-max must be the measured values.');
+
+// NMR: integration is AREA. Heights must be proportional to hydrogen count 3:2:1.
+const nmrSpec = techniqueSpecs.find((t) => t.id === 'nmr').spectrum();
+const ch3 = nmrSpec.peaks.find((p) => p.label === 'CH₃');
+const ch2 = nmrSpec.peaks.find((p) => p.label === 'CH₂');
+const oh = nmrSpec.peaks.find((p) => p.label === 'OH');
+assert(Math.abs(ch3.h / oh.h - 3) < .05 && Math.abs(ch2.h / oh.h - 2) < .05, 'NMR peak areas must be exactly 3 : 2 : 1.');
+assert(nmrSpec.integral && nmrSpec.integral.length === 3, 'NMR must show an integral trace; height alone is not integration.');
+assert(ch3.mult === 3 && ch2.mult === 4, 'NMR multiplicity must follow n+1: CH3 triplet, CH2 quartet.');
+
+// Mass spec: the base peak must be m/z 31, and alpha-cleavage must be explained.
+const ms = techniqueSpecs.find((t) => t.id === 'massspec');
+const msSpec = ms.spectrum();
+const base = msSpec.peaks.reduce((a, b) => (b.h > a.h ? b : a));
+assert(base.label === '31', 'Ethanol base peak must be m/z 31.');
+assert(msSpec.peaks.find((p) => p.label === '46 M⁺•').h < base.h, 'The molecular ion must be weaker than the base peak.');
+assert(ms.parts.Oxocarbenium && ms.steps.some((st) => st[1].includes('lone pair')), 'Mass spec must explain alpha-cleavage and the oxocarbenium.');
+
+// XRD: real Bragg angles from real NaCl + Cu K-alpha, and the two-plane model disclosed.
+const xrd = techniqueSpecs.find((t) => t.id === 'xrd');
+assert(Math.abs(xrd.braggAngles[0] - 15.86) < .1 && Math.abs(xrd.braggAngles[1] - 33.10) < .1, 'Bragg angles must come from d = 2.82 A and lambda = 1.5406 A.');
+assert(xrd.evidence.includes('cos^2') && xrd.evidence.includes('thousands'), 'XRD must disclose that two planes give broad fringes while a real crystal gives sharp peaks.');
+
+// Fluorescence: emission must terminate on a vibrationally excited S0, or the Stokes shift is fiction.
+const fluor = techniqueSpecs.find((t) => t.id === 'fluorescence');
+assert(fluor.steps[2][1].includes('upper vibrational level of S₀') || fluor.steps[2][1].includes('upper vibrational level of S0'), 'Fluorescence must emit into a vibrationally excited ground state.');
+assert(scene.includes('const topS0 = s0 + 2 * vib'), 'The Jablonski scene must land emission above the bottom of S0.');
+
 assert(new Set(lessons.map((lesson) => lesson.check.answer)).size >= 3, 'Knowledge-check answers must not share one position.');
 lessons.forEach((lesson) => {
   assert(lesson.steps.length === 4, `${lesson.id}: expected four authored investigation steps.`);
@@ -119,4 +166,4 @@ assert(scene.includes('const wasCompactMode = compactMode;') && scene.includes('
 assert(pdb5mzp.includes(' CFF '), '5MZP caffeine ligand CFF is missing.');
 assert(pdb8f76.includes(' PPI '), '8F76 propionate ligand PPI is missing.');
 
-console.log('Science integrity checks passed for 18 exhibits and 7 mechanism variants.');
+console.log('Science integrity checks passed for 12 exhibits, 7 mechanisms and 7 analytical techniques.');

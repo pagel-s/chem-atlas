@@ -239,143 +239,23 @@ export const lessons = [
     check: { q: 'What can a parallel condition screen establish directly?', options: ['That the highlighted well will give the same isolated yield at scale', 'Which tested microscale condition has the strongest illustrative analytical response and should be verified next', 'That a robot changes the reaction mechanism inside each well'], answer: 1, explanation: 'Parallel automation can efficiently compare defined small-scale conditions, but analytical confirmation, replication, and scale-up are still required.' }
   },
   {
-    id: 'ir', number: '11', title: 'Infrared spectroscopy', short: 'Bonds absorb their own frequency', category: 'Analytical techniques', color: '#3f7d8c',
-    question: 'Why does a molecule absorb infrared light only at certain frequencies?',
-    summary: 'Sweep an infrared beam across CO2 and watch each vibration absorb — but only when the vibration changes the molecule’s net dipole.',
-    evidence: 'Idealized CO2 vibrational modes at representative wavenumbers (asymmetric stretch ~2349, symmetric stretch ~1340, bend ~667 cm-1) · amplitudes exaggerated and intensities schematic, not read from a measured spectrum',
-    control: ['4000 cm⁻¹', '400 cm⁻¹'],
+    id: 'analysis', number: '11', title: 'Analytical techniques', short: 'How we know what we know', category: 'Analytical techniques', color: '#3f7d8c',
+    question: 'How does each technique interrogate a molecule, and what can each one actually prove?',
+    summary: 'Seven techniques, one idea: send something in, see what comes back, and read the molecule from the difference. Pick a technique to work through it.',
+    evidence: 'Each technique carries its own evidence note with the real literature values it uses and the places the model departs from a real experiment. Nothing here is fitted or invented; where a spectrum is simplified, it says so.',
+    control: ['Start', 'End'],
     parts: {
-      Carbon: 'The central carbon of CO2. Every vibration moves the atoms but leaves the molecule intact.',
-      Oxygen: 'The two oxygens. How they move relative to carbon decides whether the molecule’s dipole changes.',
-      'Dipole moment': 'The net separation of positive and negative charge. Infrared light is absorbed only by a vibration that makes this change; if it stays zero, the mode is IR-silent.',
-      'Absorption peak': 'A dip in transmitted infrared intensity at the frequency of an IR-active vibration.'
+      Sample: 'The molecule under test. Every technique below sends something at it - light, a magnetic field, an electron, an X-ray - and reads the molecule from what comes back.',
+      Probe: 'What goes in: infrared light, a laser, ultraviolet light, radio waves in a magnetic field, a high-energy electron, or an X-ray beam.',
+      Signal: 'What comes back, and at which value of the swept variable. That pairing is the whole content of a spectrum.',
+      'Selection rule': 'The reason a technique is blind to some things. Not every vibration absorbs infrared; not every mode scatters Raman. Knowing what a technique CANNOT see is as important as knowing what it can.',
     },
     steps: [
-      ['A beam scans the molecule', 'Infrared light of many frequencies passes through the sample. The molecule only responds when the light matches one of its vibrations, so absorption happens at specific wavenumbers.'],
-      ['The asymmetric stretch absorbs', 'Near 2349 cm⁻¹ the two C=O bonds stretch out of step. The molecule is momentarily lopsided, so its dipole flips back and forth — a changing dipole absorbs infrared light, giving a strong peak.'],
-      ['A vibration that stays silent', 'Near 1340 cm⁻¹ both bonds stretch in step. The molecule stays symmetric, so the net dipole is zero the whole time. No change in dipole means no absorption: this mode is invisible in the IR spectrum.'],
-      ['The bend absorbs too', 'Near 667 cm⁻¹ the molecule bends. That breaks the linear symmetry and creates a dipole perpendicular to the axis, so infrared light is absorbed and another peak appears.']
+      ['One idea, seven instruments', 'Every technique here does the same thing: send something in, sweep a variable, and watch for the value at which the molecule responds. Pick a technique from the selector to work through it.'],
+      ['The sweep is the x-axis', 'Whatever you sweep - wavenumber, wavelength, chemical shift, mass-to-charge, angle - becomes the horizontal axis of the spectrum. The peaks mark where the molecule answered.'],
+      ['Selection rules decide what you see', 'No technique sees everything. Infrared is blind to a vibration that does not change the dipole; Raman is blind to one that does not change the polarisability. The blind spots are the point, not a flaw.'],
+      ['Together they identify a molecule', 'No single spectrum is proof. A mass gives the formula, IR the functional groups, NMR the skeleton, X-ray the atomic positions. Chemists run several because each answers a different question.'],
     ],
-    check: { q: 'Why is the symmetric stretch of CO2 invisible in the infrared spectrum?', options: ['Its frequency is outside the infrared range', 'It is too weak to detect but still present', 'The molecule stays symmetric, so its dipole moment does not change'], answer: 2, explanation: 'IR absorption requires a change in dipole moment; the symmetric stretch keeps the dipole at zero, so it is IR-silent even though the bonds are vibrating.' }
-  },
-  {
-    id: 'raman', number: '12', title: 'Raman spectroscopy', short: 'The vibrations IR cannot see', category: 'Analytical techniques', color: '#4f8f86',
-    question: 'How can Raman scattering reveal exactly the vibrations that infrared misses?',
-    summary: 'Shine a laser on the same CO2 molecule. Raman does not need a changing dipole — it needs a changing electron cloud, which flips the selection rule on its head.',
-    evidence: 'Idealized CO2 modes at representative Raman shifts (bend ~667, symmetric stretch ~1340, asymmetric stretch ~2349 cm-1) · the electron cloud is a qualitative polarisability ellipsoid, not a computed charge density · intensities schematic',
-    control: ['0 cm⁻¹ shift', '3000 cm⁻¹ shift'],
-    parts: {
-      Carbon: 'The central carbon. The same molecule as the infrared exhibit, probed a different way.',
-      Oxygen: 'The two oxygens. Whether the bonds lengthen together or in opposition decides what Raman sees.',
-      Polarisability: 'How easily the electron cloud is distorted by light. A vibration is Raman-active only if it changes the size of this cloud — shown here as the ellipsoid breathing.',
-      Laser: 'A single fixed frequency goes in. Most light scatters straight back unchanged (Rayleigh).',
-      'Stokes photon': 'A small fraction of scattered light leaves with less energy, having handed one quantum to a vibration. The energy it lost is the Raman shift.'
-    },
-    steps: [
-      ['Scattering, not absorption', 'A laser of one fixed colour illuminates the molecule. Nearly all of it scatters back unchanged. Occasionally a photon leaves with slightly less energy, having given one quantum to a vibration — that energy loss is the Raman shift.'],
-      ['The symmetric stretch shines', 'Near 1340 cm⁻¹ both bonds lengthen and shorten together, so the electron cloud swells and contracts. That changing polarisability is what Raman needs, so a Stokes photon appears and a peak is drawn.'],
-      ['The asymmetric stretch is silent', 'Near 2349 cm⁻¹ one bond lengthens as the other shortens. The cloud shifts but its total size never changes, so the polarisability is constant and Raman sees nothing — even though this is the strongest peak in the IR.'],
-      ['Mutual exclusion', 'In a centrosymmetric molecule like CO2 the two techniques are exact complements: every mode is IR-active or Raman-active, never both. That is why chemists run them together.']
-    ],
-    check: { q: 'Why does Raman see the symmetric stretch when infrared cannot?', options: ['Raman uses a stronger light source', 'Raman needs a change in polarisability, and the symmetric stretch changes the size of the electron cloud even though the dipole stays zero', 'The symmetric stretch has a higher frequency in a Raman experiment'], answer: 1, explanation: 'The two techniques obey different selection rules: IR requires a changing dipole moment, Raman a changing polarisability, so in CO2 they pick out opposite sets of modes.' }
-  },
-  {
-    id: 'uvvis', number: '13', title: 'UV-Vis spectroscopy', short: 'Why conjugation makes colour', category: 'Analytical techniques', color: '#7a58a0',
-    question: 'Why does a longer conjugated chain absorb longer-wavelength light?',
-    summary: 'Sweep the wavelength across a polyene and change how many double bonds it has. Longer conjugation shrinks the HOMO-LUMO gap, so absorption slides toward the visible and the compound gains colour.',
-    evidence: 'Idealized polyene · lambda-max follows a simple empirical trend (about 217 nm for butadiene, rising ~37 nm per extra conjugated double bond) · energy levels and colour swatch are qualitative teaching models, not a calculated spectrum',
-    control: ['200 nm', '700 nm'],
-    parts: {
-      'Conjugated chain': 'Alternating double and single bonds let the pi electrons spread along the whole chain. The longer the chain, the more room they have.',
-      'HOMO-LUMO gap': 'The energy step an electron must make. A longer conjugated chain gives a smaller gap, so a lower-energy (longer-wavelength) photon is enough.',
-      Electron: 'One electron in the highest occupied level. It is promoted to the empty level when a photon of exactly the right energy arrives.',
-      Photon: 'Light of the swept wavelength. Only a photon whose energy matches the gap is absorbed; the rest pass straight through.'
-    },
-    steps: [
-      ['Light meets a molecule', 'Photons of every wavelength stream through the sample. Nothing happens until a photon carries exactly the energy needed to lift an electron across the HOMO-LUMO gap.'],
-      ['Matching the gap', 'Sweep the wavelength until it hits lambda-max. The electron jumps from the HOMO to the LUMO and that wavelength is removed from the transmitted light — an absorption peak.'],
-      ['Longer chains, smaller gaps', 'Use the conjugation control. Each extra double bond lets the pi electrons spread further, which lowers the gap, so absorption shifts to longer wavelength.'],
-      ['From invisible to coloured', 'A short polyene absorbs in the ultraviolet, so it looks colourless. Stretch the conjugation far enough and the absorption reaches the visible — and the compound shows the complementary colour.']
-    ],
-    check: { q: 'Why does extending conjugation shift absorption to a longer wavelength?', options: ['The molecule simply contains more electrons', 'The HOMO-LUMO gap gets smaller, so a lower-energy photon is enough', 'Longer molecules scatter more light'], answer: 1, explanation: 'Spreading the pi electrons over a longer chain lowers the HOMO-LUMO gap; a smaller energy step is matched by a lower-energy, longer-wavelength photon.' }
-  },
-  {
-    id: 'nmr', number: '14', title: 'NMR spectroscopy', short: 'Every hydrogen reports its address', category: 'Analytical techniques', color: '#486d9b',
-    question: 'Why do chemically different hydrogens appear at different places in an NMR spectrum?',
-    summary: 'Put ethanol in a magnetic field and sweep the frequency. Each proton environment resonates at its own shift, and the peak areas count the hydrogens.',
-    evidence: 'Ethanol at representative shifts (CH3 ~1.2, OH ~2.6, CH2 ~3.7 ppm) · splitting shown by the n+1 rule · OH coupling and exchange behaviour depend on conditions and are simplified here',
-    control: ['10 ppm', '0 ppm'],
-    parts: {
-      'B0 field': 'The strong external magnetic field. It sets the frequency at which a bare proton would resonate; everything else is measured relative to that.',
-      'CH3 protons': 'Three equivalent hydrogens, furthest from oxygen and therefore the most shielded — they resonate at the lowest shift and appear as a triplet (two CH2 neighbours).',
-      'CH2 protons': 'Two hydrogens next to the electronegative oxygen. Oxygen pulls electron density away, so they are deshielded and appear far downfield, split into a quartet by the three CH3 neighbours.',
-      'OH proton': 'One hydrogen on oxygen. Its shift depends strongly on solvent, temperature and exchange, and it usually appears as a singlet.'
-    },
-    steps: [
-      ['Shielding sets the shift', 'In the magnetic field every proton resonates, but the electrons around it shield it slightly. More electron density means more shielding and a lower chemical shift.'],
-      ['Deshielded by oxygen', 'Sweep to about 3.7 ppm. The CH2 hydrogens light up: oxygen pulls electron density away from them, so they feel more of the field and resonate furthest downfield.'],
-      ['The most shielded protons', 'Sweep on to about 1.2 ppm and the CH3 hydrogens resonate. They sit furthest from oxygen, keep their electron density, and so appear upfield.'],
-      ['Areas count, splitting connects', 'The peak areas are 3 : 2 : 1 — they literally count the hydrogens. And each signal is split by its neighbours (n+1), so CH3 is a triplet and CH2 a quartet.']
-    ],
-    check: { q: 'Why do the CH2 hydrogens of ethanol appear further downfield than the CH3 hydrogens?', options: ['There are fewer of them', 'They are closer to the electronegative oxygen, which removes electron density and deshields them', 'They vibrate faster'], answer: 1, explanation: 'Oxygen withdraws electron density from the neighbouring CH2, reducing the shielding those protons feel, so they resonate at a higher chemical shift than the more remote CH3.' }
-  },
-  {
-    id: 'massspec', number: '15', title: 'Mass spectrometry', short: 'Weighing the pieces', category: 'Analytical techniques', color: '#9a6b22',
-    question: 'How does breaking a molecule into charged pieces tell you what it was?',
-    summary: 'Ionise ethanol, let it fragment, then sweep the mass filter. Each mass that gets through names a piece of the original molecule.',
-    evidence: 'Ethanol under representative electron-impact conditions (M+ 46, M-H 45, CH2OH+ 31 as base peak, CH3+ 15) · relative intensities schematic · the many minor fragments of a real spectrum are omitted',
-    control: ['m/z 0', 'm/z 60'],
-    parts: {
-      'CH3 fragment': 'The methyl end. If the C-C bond breaks, this leaves as CH3+ at m/z 15.',
-      'CH2OH fragment': 'The oxygen-bearing end. It carries the charge particularly well, which is why CH2OH+ at m/z 31 is the tallest peak in ethanol.',
-      Detector: 'Only ions of the selected mass-to-charge ratio reach it. Sweeping the filter builds the spectrum one mass at a time.'
-    },
-    steps: [
-      ['Ionise the molecule', 'A high-energy electron knocks one electron out, leaving a positively charged molecular ion. Its mass tells you the molecular mass directly: ethanol appears at m/z 46.'],
-      ['It breaks along its weakest bonds', 'The ion carries excess energy and falls apart. Where it breaks is not random — it splits where it can leave the most stable charged piece.'],
-      ['Reading the fragments', 'Sweep the mass filter. At m/z 15 only the methyl end gets through; at m/z 31 the CH2OH end does, and because that fragment is especially stable it gives the tallest peak.'],
-      ['Fragments name the structure', 'The molecular ion gives the mass; the fragments say how the molecule was put together. Together they identify the compound.']
-    ],
-    check: { q: 'What does the molecular ion peak (m/z 46 for ethanol) tell you directly?', options: ['The molecular mass of the intact compound', 'Which bond is weakest', 'How many hydrogens the molecule has'], answer: 0, explanation: 'The molecular ion is the intact molecule minus one electron, so its mass-to-charge ratio gives the molecular mass; the fragment peaks are what reveal the connectivity.' }
-  },
-  {
-    id: 'xrd', number: '16', title: 'X-ray diffraction', short: 'Measuring atoms with waves', category: 'Analytical techniques', color: '#b55430',
-    question: 'How can bouncing X-rays off a crystal measure the spacing between its atoms?',
-    summary: 'Send X-rays into stacked lattice planes and sweep the angle. Reflections from successive planes only add up when the extra path is a whole number of wavelengths.',
-    evidence: 'Idealized two-plane Bragg construction · 2d·sin(theta) = n·lambda with a representative lambda/2d ratio · a real diffraction experiment involves many planes, a structure factor, and a full pattern',
-    control: ['θ = 0°', 'θ = 60°'],
-    parts: {
-      'Lattice planes': 'Sheets of atoms repeating at a fixed spacing d. This is the ruler the X-rays measure against — the same repeating order as the crystal-lattice exhibit.',
-      'X-ray beam': 'Waves reflecting from the lower plane travel an extra 2d·sin(theta). Whether that extra path is a whole number of wavelengths decides everything.',
-      'Detector spot': 'Bright only when the reflected waves arrive in step. Those angles are the Bragg angles, and from them you can solve for d.'
-    },
-    steps: [
-      ['Two planes, two reflections', 'X-rays reflect off each sheet of atoms. The wave from the deeper plane has to travel further — an extra 2d·sin(theta) — before it rejoins the first.'],
-      ['In step: a bright spot', 'Sweep the angle. When the extra path is exactly one whole wavelength, the two waves arrive in step, reinforce each other, and the detector lights up. This is the first Bragg angle.'],
-      ['Out of step: nothing', 'At angles in between, the waves arrive out of step and cancel. Most angles give no signal at all, which is why diffraction gives sharp spots rather than a smear.'],
-      ['From angle to spacing', 'Keep sweeping and a second reflection appears where the path difference is two wavelengths. Measuring these angles and knowing the wavelength gives you d — the distance between atomic planes.']
-    ],
-    check: { q: 'Why does the detector only light up at particular angles?', options: ['The X-ray source is only on at those angles', 'Only at those angles is the extra path a whole number of wavelengths, so the reflected waves add up', 'The crystal only reflects at those angles'], answer: 1, explanation: 'Bragg\'s law: constructive interference needs 2d·sin(theta) = n·lambda. At other angles the reflected waves are out of step and cancel, so no spot appears.' }
-  },
-  {
-    id: 'fluorescence', number: '17', title: 'Fluorescence', short: 'Light out is redder than light in', category: 'Analytical techniques', color: '#5c7940',
-    question: 'Why is emitted light always lower in energy than the light that was absorbed?',
-    summary: 'Follow one electron through absorption, vibrational relaxation and emission on a Jablonski diagram, and see where the Stokes shift comes from.',
-    evidence: 'Idealized Jablonski diagram with three vibrational sublevels per electronic state · non-radiative relaxation and emission shown as a single clean sequence · real systems also lose molecules to quenching and intersystem crossing',
-    control: ['Absorb', 'Emit'],
-    parts: {
-      'Ground state': 'S0, where the molecule starts and ends. Its vibrational sublevels are the ladder within the electronic state.',
-      'Excited state': 'S1. The molecule is promoted here by absorbing a photon, usually landing on an upper vibrational rung rather than the bottom.',
-      Electron: 'Follow it: up on absorption, quietly down the vibrational ladder, then back to the ground state as it emits.',
-      'Absorbed photon': 'A high-energy (blue) photon lifts the electron into S1.',
-      'Emitted photon': 'The photon released on the way back down. Because energy was already lost as vibration, it is lower in energy and redder — the Stokes shift.'
-    },
-    steps: [
-      ['Absorption lifts the electron', 'A photon promotes the electron from S0 to S1. It usually arrives on a higher vibrational rung of S1, not the very bottom.'],
-      ['Energy leaks away as heat', 'The molecule slides down the vibrational ladder of S1 without emitting any light. That energy is lost to its surroundings as heat — and it is lost for good.'],
-      ['Emission from the bottom', 'Only now does the electron drop back to S0, releasing a photon. But it starts from lower down than where it arrived, so the photon it emits carries less energy.'],
-      ['The Stokes shift', 'Emitted light is therefore always redder than the light absorbed. That gap between the absorption and emission bands is the Stokes shift, and it is what makes fluorescence so easy to detect.']
-    ],
-    check: { q: 'Why is fluorescent light lower in energy than the light absorbed?', options: ['Some photons are absorbed twice', 'Energy is lost as vibration before the photon is emitted, so emission starts from a lower level', 'The detector measures it incorrectly'], answer: 1, explanation: 'After absorption the molecule relaxes down the vibrational ladder without emitting, so the photon released on returning to S0 carries less energy than the one absorbed — the Stokes shift.' }
+    check: { q: 'Why do chemists run several analytical techniques on the same compound?', options: ['To repeat the same measurement and reduce error', 'Because each technique answers a different question and is deliberately blind to others', 'Because one technique is usually broken'], answer: 1, explanation: 'Each technique has its own selection rules and reports on a different property - mass, functional groups, hydrogen environments, atomic spacing. They are complementary, not redundant, which is why a structure is argued from several spectra together.' }
   }
 ];

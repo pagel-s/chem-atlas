@@ -2419,12 +2419,69 @@ function latticeExhibit(progress) {
   return g;
 }
 
-// Shared CO2 normal-mode geometry, parameterised by proper mode coordinates:
-// symmetric stretch (s), asymmetric stretch (a) and bend angle (phi). The carbon is
-// placed so the centre of mass stays fixed. Two observables then fall straight out of
-// the geometry, which is what makes IR and Raman exact complements:
-//   dipole       mu    = -(rL*dirL + rR*dirR)   -> zero ONLY for the symmetric stretch
-//   polarisability propto (rL + rR)             -> changes ONLY for the symmetric stretch
+// ---------------------------------------------------------------------------------------
+// ANALYTICAL TECHNIQUES
+// ---------------------------------------------------------------------------------------
+
+// A real travelling wave. Crests are placed from the ACTUAL path length, so when two beams
+// have a genuine path difference they visibly fall in or out of step - the interference is
+// emergent, not drawn by hand.
+function waveBeam(group, color, part, segments = 140) {
+  const positions = new Float32Array(segments * 3);
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+  const line = new THREE.Line(geometry, new THREE.LineBasicMaterial({ color, transparent: true, opacity: 0, linewidth: 2 }));
+  line.visible = false; tag(line, part); group.add(line);
+  const REF = new THREE.Vector3(0, 0, 1);
+  return (from, to, wavelength, phase, amp, opacity = 1, colorOverride) => {
+    line.visible = opacity > .02;
+    if (!line.visible) return;
+    if (colorOverride !== undefined) line.material.color.set(colorOverride);
+    const dir = to.clone().sub(from);
+    const len = dir.length();
+    if (len < .001) { line.visible = false; return; }
+    const unit = dir.clone().normalize();
+    let perp = new THREE.Vector3().crossVectors(unit, REF);
+    if (perp.lengthSq() < .0001) perp = new THREE.Vector3().crossVectors(unit, new THREE.Vector3(0, 1, 0));
+    perp.normalize();
+    for (let i = 0; i < segments; i += 1) {
+      const s = (i / (segments - 1)) * len;
+      const off = Math.sin((s / wavelength) * Math.PI * 2 + phase) * amp;
+      const pt = from.clone().addScaledVector(unit, s).addScaledVector(perp, off);
+      positions[i * 3] = pt.x; positions[i * 3 + 1] = pt.y; positions[i * 3 + 2] = pt.z;
+    }
+    geometry.attributes.position.needsUpdate = true;
+    line.material.opacity = opacity;
+  };
+}
+
+// A straight arrow whose length/direction can be set every frame.
+function liveArrow(group, color, part, radius = .03, headSize = .12) {
+  const shaft = new THREE.Mesh(new THREE.CylinderGeometry(radius, radius, 1, 12), material(color, { emissive: color, emissiveIntensity: .3, transparent: true }));
+  const head = new THREE.Mesh(new THREE.ConeGeometry(headSize, headSize * 2, 14), material(color, { emissive: color, emissiveIntensity: .3, transparent: true }));
+  tag(shaft, part); tag(head, part); shaft.visible = false; head.visible = false;
+  group.add(shaft, head);
+  return (from, to, opacity = 1) => {
+    const dir = to.clone().sub(from);
+    const len = dir.length();
+    const on = opacity > .02 && len > .02;
+    shaft.visible = on; head.visible = on;
+    if (!on) return;
+    const unit = dir.clone().normalize();
+    shaft.position.copy(from).lerp(to, .5);
+    shaft.scale.set(1, Math.max(.02, len - headSize * 1.6), 1);
+    shaft.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), unit);
+    head.position.copy(to).addScaledVector(unit, -headSize);
+    head.quaternion.copy(shaft.quaternion);
+    shaft.material.opacity = opacity; head.material.opacity = opacity;
+  };
+}
+
+// CO2 normal modes from proper mode coordinates (symmetric stretch s, asymmetric a, bend phi),
+// with the carbon placed so the centre of mass stays fixed. Both selection-rule observables
+// then fall straight out of the geometry, which is why IR and Raman are exact complements:
+//   dipole         mu = -(rL*dirL + rR*dirR)  -> zero ONLY for the symmetric stretch
+//   polarisability propto (rL + rR)           -> varies ONLY for the symmetric stretch
 const CO2_L = 1.2;
 function co2State(aSym, aAsym, aBend, tt) {
   const s = Math.sin(tt * 9) * aSym * .26;
@@ -2443,7 +2500,6 @@ function co2State(aSym, aAsym, aBend, tt) {
     polar: (rL + rR) / (2 * CO2_L),
   };
 }
-
 const co2Atoms = (g) => ({
   cC: atom(g, [0, 0, 0], .3, C.carbon, 'Carbon', { roughness: .3 }),
   oL: atom(g, [-CO2_L, 0, 0], .34, C.oxygen, 'Oxygen', { roughness: .3 }),
@@ -2451,99 +2507,108 @@ const co2Atoms = (g) => ({
   bL: animatedMechanismDoubleBond(g, 0x45504d, .03, .12, 'Carbon'),
   bR: animatedMechanismDoubleBond(g, 0x45504d, .03, .12, 'Carbon'),
 });
+const nearestMode = (modes, value, width = .05) => {
+  let best = null, amp = 0;
+  const amps = {};
+  modes.forEach((m) => {
+    amps[m.kind] = Math.exp(-Math.pow((value - m.p) / width, 2));
+    if (amps[m.kind] > amp) { amp = amps[m.kind]; best = m; }
+  });
+  return { amps, best, amp };
+};
 
-// IR: sweep 4000 -> 400 cm-1. A mode absorbs only if it changes the dipole.
-function irExhibit(progress, parameters = {}, step = 0, time = 0) {
-  const g = new THREE.Group();
+// IR -- the beam is drawn as a real wave. If the mode is IR-active at this frequency the wave
+// STOPS at the molecule (absorbed); otherwise it carries straight on (transmitted).
+function irScene(g, progress, tt) {
   const V = (x, y, z) => new THREE.Vector3(x, y, z);
   const mol = co2Atoms(g);
-  const dipoleShaft = new THREE.Mesh(new THREE.CylinderGeometry(.032, .032, 1, 12), material(0xe0ad35, { emissive: 0x8a5d0d, emissiveIntensity: .25, transparent: true }));
-  const dipoleHead = new THREE.Mesh(new THREE.ConeGeometry(.11, .24, 14), material(0xe0ad35, { emissive: 0x8a5d0d, emissiveIntensity: .25, transparent: true }));
-  tag(dipoleShaft, 'Dipole moment'); tag(dipoleHead, 'Dipole moment'); g.add(dipoleShaft, dipoleHead);
-  const dipoleLabel = labelSprite('net dipole', '#ffd36b', .26); tag(dipoleLabel, 'Dipole moment'); g.add(dipoleLabel);
-  const capAsym = labelSprite('asymmetric stretch: dipole flips -> absorbs', '#cfe0e4', .55); capAsym.position.set(0, -1.15, 0); g.add(capAsym);
-  const capSym = labelSprite('symmetric stretch: no dipole change -> silent', '#e7c96a', .55); capSym.position.set(0, -1.15, 0); g.add(capSym);
-  const capBend = labelSprite('bend: dipole appears -> absorbs', '#cfe0e4', .44); capBend.position.set(0, -1.15, 0); g.add(capBend);
-  const modes = [{ p: .459, kind: 'asym' }, { p: .739, kind: 'sym' }, { p: .926, kind: 'bend' }];
+  const dip = liveArrow(g, 0xe0ad35, 'Dipole moment', .035, .14);
+  const dipLabel = labelSprite('net dipole', '#ffd36b', .28); tag(dipLabel, 'Dipole moment'); g.add(dipLabel);
+  const inWave = waveBeam(g, 0xc2557a, 'Absorption band');
+  const outWave = waveBeam(g, 0xc2557a, 'Absorption band');
+  const absorbedTag = labelSprite('ABSORBED', '#e88aa6', .42); absorbedTag.position.set(0, 1.65, 0); g.add(absorbedTag);
+  const passTag = labelSprite('transmitted', '#a9b3b0', .42); passTag.position.set(0, 1.65, 0); g.add(passTag);
+  const caps = {
+    asym: labelSprite('asymmetric stretch · dipole flips · ABSORBS', '#e88aa6', .5),
+    sym: labelSprite('symmetric stretch · dipole stays zero · SILENT', '#e7c96a', .52),
+    bend: labelSprite('bend · dipole tips sideways · ABSORBS', '#e88aa6', .46),
+  };
+  Object.values(caps).forEach((c) => { c.position.set(.95, -1.55, 0); g.add(c); });
+  const modes = [{ p: (4000 - 2349) / 3600, kind: 'asym', active: true }, { p: (4000 - 1333) / 3600, kind: 'sym', active: false }, { p: (4000 - 667) / 3600, kind: 'bend', active: true }];
 
-  g.userData.update = (value, params, stepIndex, tt = 0) => {
-    const amp = {};
-    let near = null, nearAmp = 0;
-    modes.forEach((m) => {
-      amp[m.kind] = Math.exp(-Math.pow((value - m.p) / .05, 2));
-      if (amp[m.kind] > nearAmp) { nearAmp = amp[m.kind]; near = m; }
-    });
-    const st = co2State(amp.sym || 0, amp.asym || 0, amp.bend || 0, tt);
+  return (value, tt2) => {
+    const { amps, best, amp } = nearestMode(modes, value);
+    const st = co2State(amps.sym || 0, amps.asym || 0, amps.bend || 0, tt2);
     mol.oL.position.copy(st.pL); mol.oR.position.copy(st.pR); mol.cC.position.copy(st.pC);
     mol.bL(st.pC, st.pL, 1); mol.bR(st.pC, st.pR, 1);
     const mag = st.mu.length();
     const show = mag > .04;
-    dipoleShaft.visible = show; dipoleHead.visible = show; dipoleLabel.visible = show;
     if (show) {
       const dir = st.mu.clone().normalize();
-      const start = st.pC.clone().add(V(0, .55, 0));
-      const end = start.clone().addScaledVector(dir, Math.min(mag * 1.7, 1.2));
-      dipoleShaft.position.copy(start).lerp(end, .5);
-      dipoleShaft.scale.set(1, Math.max(.05, start.distanceTo(end)), 1);
-      dipoleShaft.quaternion.setFromUnitVectors(V(0, 1, 0), dir);
-      dipoleHead.position.copy(end); dipoleHead.quaternion.setFromUnitVectors(V(0, 1, 0), dir);
-      dipoleLabel.position.copy(start).add(V(-1.05, .3, 0));
-    }
-    capAsym.visible = near?.kind === 'asym' && nearAmp > .4;
-    capSym.visible = near?.kind === 'sym' && nearAmp > .4;
-    capBend.visible = near?.kind === 'bend' && nearAmp > .4;
+      const a = st.pC.clone().add(V(0, .62, 0));
+      const b = a.clone().addScaledVector(dir, Math.min(mag * 1.8, 1.25));
+      dip(a, b, 1);
+      dipLabel.visible = true;
+      dipLabel.position.copy(a).add(V(-1.1, .32, 0));
+    } else { dip(V(), V(), 0); dipLabel.visible = false; }
+    // the IR beam: shorter wavelength at high wavenumber
+    const wn = 4000 - value * 3600;
+    const lam = Math.max(.28, 900 / wn);
+    const phase = -tt2 * 7;
+    const absorbing = !!best && amp > .45 && best.active;
+    inWave(V(-4.2, -1.05, 0), V(-1.75, -1.05, 0), lam, phase, .17, .95);
+    outWave(V(1.75, -1.05, 0), V(4.2, -1.05, 0), lam, phase, .17, absorbing ? .06 : .95);
+    absorbedTag.visible = absorbing;
+    passTag.visible = !absorbing;
+    Object.entries(caps).forEach(([k, c]) => { c.visible = best?.kind === k && amp > .45; });
   };
-  g.userData.update(progress, parameters, step, time);
-  g.scale.setScalar(.85); g.rotation.set(.12, -.16, 0); return g;
 }
 
-// Raman: sweep the Raman shift 0 -> 3000 cm-1. The same CO2, but the observable is the
-// polarisability (drawn as an ellipsoid that breathes). Exactly the modes IR cannot see.
-function ramanExhibit(progress, parameters = {}, step = 0, time = 0) {
-  const g = new THREE.Group();
+// Raman -- the scattered Stokes photon is drawn with a visibly LONGER wavelength than the
+// laser: that is what "lower energy" means, made literal.
+function ramanScene(g, progress, tt) {
   const V = (x, y, z) => new THREE.Vector3(x, y, z);
   const mol = co2Atoms(g);
-  const cloud = new THREE.Mesh(new THREE.SphereGeometry(1, 32, 22), material(0x6f9fb5, {
-    transparent: true, opacity: .2, side: THREE.DoubleSide, depthWrite: false, emissive: 0x2f5468, emissiveIntensity: .12,
+  const cloud = new THREE.Mesh(new THREE.SphereGeometry(1, 36, 24), material(0x6f9fb5, {
+    transparent: true, opacity: .22, side: THREE.DoubleSide, depthWrite: false, emissive: 0x2f5468, emissiveIntensity: .14,
   }));
   tag(cloud, 'Polarisability'); g.add(cloud);
-  const cloudLabel = labelSprite('electron cloud (polarisability)', '#9fd0e0', .52); cloudLabel.position.set(-1.3, 1.5, 0); tag(cloudLabel, 'Polarisability'); g.add(cloudLabel);
-  const laserIn = arrow(g, [-3.0, 1.7, 0], [-1.85, .9, 0], 0x67a85f, 'Laser');
-  const rayleighOut = arrow(g, [1.85, .9, 0], [2.9, 1.6, 0], 0x67a85f, 'Laser');
-  const stokesOut = arrow(g, [1.85, -.85, 0], [2.9, -1.55, 0], 0xd2622f, 'Stokes photon');
-  const laserLabel = labelSprite('laser in', '#8fd08a', .3); laserLabel.position.set(-2.6, 2.05, 0); g.add(laserLabel);
-  const rayleighLabel = labelSprite('Rayleigh (no shift)', '#8fd08a', .46); rayleighLabel.position.set(2.5, 2.0, 0); g.add(rayleighLabel);
-  const stokesLabel = labelSprite('Stokes: shifted photon', '#eda079', .52); stokesLabel.position.set(2.3, -1.95, 0); tag(stokesLabel, 'Stokes photon'); g.add(stokesLabel);
-  const capSym = labelSprite('symmetric stretch: cloud breathes -> Raman peak', '#8fd08a', .58); capSym.position.set(0, -1.25, 0); g.add(capSym);
-  const capAsym = labelSprite('asymmetric stretch: cloud size fixed -> Raman silent', '#e7c96a', .58); capAsym.position.set(0, -1.25, 0); g.add(capAsym);
-  const capBend = labelSprite('bend: cloud size fixed -> Raman silent', '#e7c96a', .5); capBend.position.set(0, -1.25, 0); g.add(capBend);
-  const modes = [{ p: .222, kind: 'bend' }, { p: .447, kind: 'sym' }, { p: .783, kind: 'asym' }];
+  const laser = waveBeam(g, 0x67a85f, 'Laser');
+  const rayleigh = waveBeam(g, 0x67a85f, 'Laser');
+  const stokes = waveBeam(g, 0xd2622f, 'Stokes photon');
+  const lLabel = labelSprite('laser in', '#8fd08a', .34); lLabel.position.set(-2.8, .62, 0); g.add(lLabel);
+  const rLabel = labelSprite('Rayleigh · same λ', '#8fd08a', .4); rLabel.position.set(2.15, 1.55, 0); g.add(rLabel);
+  const sLabel = labelSprite('Stokes · longer λ = lower energy', '#eda079', .5); sLabel.position.set(2.0, -1.6, 0); tag(sLabel, 'Stokes photon'); g.add(sLabel);
+  const caps = {
+    sym: labelSprite('symmetric stretch · cloud BREATHES · Raman active', '#8fd08a', .56),
+    asym: labelSprite('asymmetric stretch · cloud size fixed · SILENT', '#e7c96a', .55),
+    bend: labelSprite('bend · cloud size fixed · SILENT', '#e7c96a', .42),
+  };
+  Object.values(caps).forEach((c) => { c.position.set(.95, -1.45, 0); g.add(c); });
+  const modes = [{ p: 667 / 3000, kind: 'bend', active: false }, { p: 1336 / 3000, kind: 'sym', active: true }, { p: 2349 / 3000, kind: 'asym', active: false }];
 
-  g.userData.update = (value, params, stepIndex, tt = 0) => {
-    const amp = {};
-    let near = null, nearAmp = 0;
-    modes.forEach((m) => {
-      amp[m.kind] = Math.exp(-Math.pow((value - m.p) / .05, 2));
-      if (amp[m.kind] > nearAmp) { nearAmp = amp[m.kind]; near = m; }
-    });
-    const st = co2State(amp.sym || 0, amp.asym || 0, amp.bend || 0, tt);
+  return (value, tt2) => {
+    const { amps, best, amp } = nearestMode(modes, value);
+    const st = co2State(amps.sym || 0, amps.asym || 0, amps.bend || 0, tt2);
     mol.oL.position.copy(st.pL); mol.oR.position.copy(st.pR); mol.cC.position.copy(st.pC);
     mol.bL(st.pC, st.pL, 1); mol.bR(st.pC, st.pR, 1);
-    // amplify the polarisability change so the breathing is visible
-    const k = 1 + (st.polar - 1) * 2.4;
-    cloud.scale.set(1.95 * k, 1.0 * k, 1.0 * k);
-    const ramanActive = Math.abs(st.polar - 1) > .012;
-    [stokesOut[0], stokesOut[1]].forEach((m) => { m.visible = ramanActive; });
-    stokesLabel.visible = ramanActive;
-    capSym.visible = near?.kind === 'sym' && nearAmp > .4;
-    capAsym.visible = near?.kind === 'asym' && nearAmp > .4;
-    capBend.visible = near?.kind === 'bend' && nearAmp > .4;
+    const k = 1 + (st.polar - 1) * 2.6;
+    cloud.scale.set(1.95 * k, 1.02 * k, 1.02 * k);
+    const phase = -tt2 * 7;
+    const lam = .42;
+    laser(V(-3.6, .28, 0), V(-1.9, .05, 0), lam, phase, .15, .95);
+    rayleigh(V(1.9, .05, 0), V(3.5, 1.15, 0), lam, phase, .15, .95);
+    // Raman-active only when the polarisability is actually changing
+    const active = Math.abs(st.polar - 1) > .012;
+    // a Stokes photon has lost one vibrational quantum -> longer wavelength
+    const stokesLam = lam * 1.75;
+    stokes(V(1.9, -.15, 0), V(3.5, -1.25, 0), stokesLam, phase, .17, active ? .95 : 0);
+    sLabel.visible = active;
+    Object.entries(caps).forEach(([kk, c]) => { c.visible = best?.kind === kk && amp > .45; });
   };
-  g.userData.update(progress, parameters, step, time);
-  g.scale.setScalar(.6); g.position.set(-.5, 0, 0); g.rotation.set(.1, -.14, 0); return g;
 }
 
-// Approximate visible colour of a wavelength (nm); below 380 nm reads as UV (violet-grey).
+// Approximate visible colour of a wavelength (nm); below 380 nm is UV (violet-grey).
 function wavelengthColor(nm) {
   if (nm < 380) return new THREE.Color(0x8a7fa8);
   let r = 0, gr = 0, b = 0;
@@ -2555,273 +2620,335 @@ function wavelengthColor(nm) {
   else { r = 1; }
   return new THREE.Color(r, gr, b);
 }
+const POLYENE_LAMBDA = { 2: 217, 3: 258, 4: 290, 5: 334, 6: 364 };
 
-// UV-Vis: sweep the wavelength; a separate control sets the conjugation length. Longer
-// conjugation -> smaller HOMO-LUMO gap -> absorption moves to longer wavelength.
-function uvvisExhibit(progress, parameters = {}, step = 0, time = 0) {
-  const g = new THREE.Group();
+// UV-Vis -- flat energy diagram (no perspective skew), a real coloured photon wave, and the
+// gap arrow shrinking as the box gets longer.
+function uvvisScene(g, progress, tt) {
   const V = (x, y, z) => new THREE.Vector3(x, y, z);
   const MAXC = 12;
-  const carbons = []; const chainBonds = []; const chainPi = [];
-  for (let i = 0; i < MAXC; i += 1) carbons.push(atom(g, [0, 0, 0], .18, C.carbon, 'Conjugated chain', { roughness: .32 }));
+  const carbons = []; const sigma = []; const pi = [];
+  for (let i = 0; i < MAXC; i += 1) carbons.push(atom(g, [0, 0, 0], .17, C.carbon, 'Conjugated chain', { roughness: .32 }));
   for (let i = 0; i < MAXC - 1; i += 1) {
-    chainBonds.push(animatedMechanismBond(g, 0x69736f, .042, 'Conjugated chain'));
-    chainPi.push(animatedMechanismBond(g, 0x67a85f, .03, 'Conjugated chain'));
+    sigma.push(animatedMechanismBond(g, 0x69736f, .04, 'Conjugated chain'));
+    pi.push(animatedMechanismBond(g, 0x67a85f, .028, 'Conjugated chain'));
   }
-  const homoBar = new THREE.Mesh(new THREE.BoxGeometry(1.1, .05, .05), material(0x7f8a87, { emissive: 0x3a4341, emissiveIntensity: .2 }));
-  const lumoBar = new THREE.Mesh(new THREE.BoxGeometry(1.1, .05, .05), material(0x7f8a87, { emissive: 0x3a4341, emissiveIntensity: .2 }));
-  tag(homoBar, 'HOMO-LUMO gap'); tag(lumoBar, 'HOMO-LUMO gap'); g.add(homoBar, lumoBar);
-  const homoLabel = labelSprite('HOMO', '#c7d0cc', .24); g.add(homoLabel);
-  const lumoLabel = labelSprite('LUMO', '#c7d0cc', .24); g.add(lumoLabel);
-  const electron = atom(g, [0, 0, 0], .1, 0xe0ad35, 'Electron', { emissive: 0xe0ad35, emissiveIntensity: .7 });
-  const photon = atom(g, [0, 0, 0], .17, 0x8a7fa8, 'Photon', { emissive: 0x8a7fa8, emissiveIntensity: .6 });
-  const gapLabel = labelSprite('gap', '#e7c96a', .22); tag(gapLabel, 'HOMO-LUMO gap'); g.add(gapLabel);
-  const capAbsorb = labelSprite('photon energy = gap -> electron promoted -> absorbs', '#8fd08a', .62); capAbsorb.position.set(0, -1.75, 0); g.add(capAbsorb);
-  const capPass = labelSprite('photon energy does not match the gap -> passes through', '#a9b3b0', .62); capPass.position.set(0, -1.75, 0); g.add(capPass);
+  const bar = (part) => {
+    const m = new THREE.Mesh(new THREE.BoxGeometry(1.5, .06, .06), material(0x8a938f, { emissive: 0x3a4341, emissiveIntensity: .25 }));
+    tag(m, part); g.add(m); return m;
+  };
+  const homo = bar('HOMO-LUMO gap'); const lumo = bar('HOMO-LUMO gap');
+  const homoL = labelSprite('HOMO', '#c7d0cc', .28); g.add(homoL);
+  const lumoL = labelSprite('LUMO', '#c7d0cc', .28); g.add(lumoL);
+  const gapArrow = liveArrow(g, 0xe7c96a, 'HOMO-LUMO gap', .026, .1);
+  const gapLabel = labelSprite('gap', '#e7c96a', .24); tag(gapLabel, 'HOMO-LUMO gap'); g.add(gapLabel);
+  const electron = atom(g, [0, 0, 0], .11, 0xe0ad35, 'Electron', { emissive: 0xe0ad35, emissiveIntensity: .85 });
+  const photon = waveBeam(g, 0x8a7fa8, 'Photon');
+  const swatch = new THREE.Mesh(new THREE.PlaneGeometry(.62, .62), material(0xffffff, { transparent: true, opacity: .95, side: THREE.DoubleSide }));
+  swatch.position.set(3.05, -.15, 0); tag(swatch, 'Photon'); g.add(swatch);
+  const swatchL = labelSprite('you see', '#c7d0cc', .3); swatchL.position.set(3.05, .42, 0); g.add(swatchL);
+  const capAbs = labelSprite('photon energy = gap · ABSORBED', '#8fd08a', .48); capAbs.position.set(.95, -2.05, 0); g.add(capAbs);
+  const capPass = labelSprite('energy does not match the gap · passes through', '#a9b3b0', .55); capPass.position.set(.95, -2.05, 0); g.add(capPass);
 
-  g.userData.update = (value, params = {}, stepIndex, tt = 0) => {
-    const n = Math.round(params.conjugation ?? 3);
+  return (value, tt2, params = {}) => {
+    const n = Math.round(params.conjugation ?? 2);
     const nC = n * 2;
     const lambda = 200 + value * 500;
-    const lambdaMax = 217 + 37 * (n - 2);
-    const absorb = Math.exp(-Math.pow((lambda - lambdaMax) / 20, 2));
-    const spacing = .5;
-    const x0 = -(nC - 1) * spacing / 2 - .7;
+    const lambdaMax = POLYENE_LAMBDA[n] || 217;
+    const absorb = Math.exp(-Math.pow((lambda - lambdaMax) / 15, 2));
+    const spacing = .46;
+    const x0 = -(nC - 1) * spacing / 2 - 1.55;
     for (let i = 0; i < MAXC; i += 1) {
       const on = i < nC;
       carbons[i].visible = on;
-      if (on) carbons[i].position.set(x0 + i * spacing, .55 + (i % 2 === 0 ? .18 : -.18), 0);
+      if (on) carbons[i].position.set(x0 + i * spacing, .35 + (i % 2 === 0 ? .16 : -.16), 0);
+      carbons[i].material.emissive = new THREE.Color(absorb > .4 ? 0x4a7a3a : 0x000000);
+      carbons[i].material.emissiveIntensity = absorb > .4 ? .35 : 0;
     }
     for (let i = 0; i < MAXC - 1; i += 1) {
       const on = i < nC - 1;
-      const isDouble = i % 2 === 0;
-      chainBonds[i](carbons[i].position, carbons[i + 1].position, on ? 1 : 0);
-      chainPi[i](carbons[i].position.clone().add(V(0, 0, .14)), carbons[i + 1].position.clone().add(V(0, 0, .14)), on && isDouble ? 1 : 0);
+      sigma[i](carbons[i].position, carbons[i + 1].position, on ? 1 : 0);
+      pi[i](carbons[i].position.clone().add(V(0, 0, .13)), carbons[i + 1].position.clone().add(V(0, 0, .13)), on && i % 2 === 0 ? 1 : 0);
     }
-    const gap = 3.6 / n;
-    const homoY = -1.15, lumoY = homoY + gap;
-    homoBar.position.set(1.85, homoY, 0); lumoBar.position.set(1.85, lumoY, 0);
-    homoLabel.position.set(.95, homoY, 0); lumoLabel.position.set(.95, lumoY, 0);
-    gapLabel.position.set(2.6, (homoY + lumoY) / 2, 0);
-    electron.position.set(1.85, homoY + absorb * gap, 0);
+    // energy levels: gap shrinks as the box lengthens (particle in a box)
+    const gap = 2.9 / (n * .55 + .35);
+    const hy = -1.0, ly = hy + gap;
+    homo.position.set(2.15, hy, 0); lumo.position.set(2.15, ly, 0);
+    homoL.position.set(1.05, hy, 0); lumoL.position.set(1.05, ly, 0);
+    gapArrow(V(3.0, hy, 0), V(3.0, ly, 0), 1);
+    gapLabel.position.set(3.4, (hy + ly) / 2, 0);
+    electron.position.set(2.15, hy + absorb * gap, 0);
     const col = wavelengthColor(lambda);
-    photon.material.color.copy(col); photon.material.emissive.copy(col);
-    const px = -3.0 + ((tt * .9) % 1) * 2.0;
-    photon.position.set(px, 1.75, 0);
-    capAbsorb.visible = absorb > .35;
-    capPass.visible = absorb <= .35;
+    const lam = .3 + (lambda - 200) / 500 * .55;
+    photon(V(-4.4, 1.5, 0), absorb > .4 ? V(x0 - .3, 1.5, 0) : V(4.4, 1.5, 0), lam, -tt2 * 7, .16, .95, col);
+    // transmitted light: white minus what was absorbed
+    const t = swatch.material.color;
+    if (absorb > .4 && lambda >= 380) { t.setRGB(1 - col.r * .92, 1 - col.g * .92, 1 - col.b * .92); }
+    else { t.setRGB(.96, .96, .94); }
+    capAbs.visible = absorb > .4;
+    capPass.visible = absorb <= .4;
   };
-  g.userData.update(progress, parameters, step, time);
-  g.scale.setScalar(.6); g.position.set(-.35, 0, 0); g.rotation.set(.06, -.1, 0); return g;
 }
 
-// NMR: sweep the chemical shift. Each proton environment lights up (and precesses) as the
-// sweep reaches its shift; how shielded it is decides where it appears.
-function nmrExhibit(progress, parameters = {}, step = 0, time = 0) {
-  const g = new THREE.Group();
+// NMR -- the shielding is made visible: each proton carries an electron cloud whose SIZE is
+// its shielding. The fat cloud on CH3 is exactly why it sits upfield.
+function nmrScene(g, progress, tt) {
   const V = (x, y, z) => new THREE.Vector3(x, y, z);
-  const c1 = V(-1.25, -.15, 0), c2 = V(-.05, .35, 0), oO = V(1.15, -.1, 0);
+  const c1 = V(-1.15, -.2, 0), c2 = V(.05, .3, 0), oO = V(1.25, -.15, 0);
   atom(g, c1.toArray(), .24, C.carbon, 'CH3 protons', { roughness: .3 });
   atom(g, c2.toArray(), .24, C.carbon, 'CH2 protons', { roughness: .3 });
-  atom(g, oO.toArray(), .27, C.oxygen, 'OH proton', { roughness: .3 });
+  atom(g, oO.toArray(), .28, C.oxygen, 'OH proton', { roughness: .3 });
   bond(g, c1.toArray(), c2.toArray(), .05, 0x69736f, 'CH2 protons');
   bond(g, c2.toArray(), oO.toArray(), .05, 0x69736f, 'CH2 protons');
-  const mk = (base, dirs, len, col, part) => dirs.map((d) => {
+  // shieldingR: bigger cloud = more electron density = more shielded = further upfield
+  const mk = (base, dirs, len, col, part, shieldR) => dirs.map((d) => {
     const p = base.clone().addScaledVector(d.clone().normalize(), len);
-    const h = atom(g, p.toArray(), .15, col, part, { roughness: .38, emissive: col, emissiveIntensity: .1 });
-    bond(g, base.toArray(), p.toArray(), .035, 0x767c79, part);
-    return { mesh: h, home: p.clone() };
+    const h = atom(g, p.toArray(), .14, col, part, { roughness: .38, emissive: col, emissiveIntensity: .1 });
+    bond(g, base.toArray(), p.toArray(), .032, 0x767c79, part);
+    const cloud = new THREE.Mesh(new THREE.SphereGeometry(shieldR, 20, 14), material(0x7fa8c4, {
+      transparent: true, opacity: .3, depthWrite: false, side: THREE.DoubleSide, emissive: 0x33607a, emissiveIntensity: .15,
+    }));
+    cloud.position.copy(p); tag(cloud, part); g.add(cloud);
+    return { mesh: h, cloud, home: p.clone() };
   });
-  const ch3 = mk(c1, [V(-.6, .75, .3), V(-.75, -.5, -.35), V(-.2, -.5, .8)], .85, 0x6f9fb5, 'CH3 protons');
-  const ch2 = mk(c2, [V(-.1, .9, .5), V(.05, .85, -.6)], .85, 0x7fae74, 'CH2 protons');
-  const oh = mk(oO, [V(.85, .6, 0)], .8, 0xd0904a, 'OH proton');
-  const b0 = arrow(g, [-2.7, -1.1, 0], [-2.7, 1.3, 0], 0x8fa0b8, 'B0 field');
-  const b0Label = labelSprite('B0', '#b7c6da', .2); b0Label.position.set(-2.7, 1.6, 0); g.add(b0Label);
-  const capCH2 = labelSprite('CH2 · 2H · quartet · deshielded by O', '#8fd08a', .6); capCH2.position.set(0, -1.6, 0); g.add(capCH2);
-  const capOH = labelSprite('OH · 1H · singlet', '#eda079', .42); capOH.position.set(0, -1.6, 0); g.add(capOH);
-  const capCH3 = labelSprite('CH3 · 3H · triplet · most shielded', '#9fd0e0', .6); capCH3.position.set(0, -1.6, 0); g.add(capCH3);
-  const envs = [
-    { p: .63, group: ch2, cap: capCH2 },
-    { p: .74, group: oh, cap: capOH },
-    { p: .88, group: ch3, cap: capCH3 },
-  ];
-
-  g.userData.update = (value, params, stepIndex, tt = 0) => {
-    envs.forEach((e) => {
-      const amp = Math.exp(-Math.pow((value - e.p) / .035, 2));
-      e.cap.visible = amp > .4;
-      e.group.forEach((h, i) => {
-        h.mesh.material.emissiveIntensity = .1 + amp * 1.1;
-        const wob = amp * .12;
-        h.mesh.position.copy(h.home).add(V(Math.cos(tt * 6 + i * 2) * wob, 0, Math.sin(tt * 6 + i * 2) * wob));
-      });
-    });
-  };
-  g.userData.update(progress, parameters, step, time);
-  g.scale.setScalar(.78); g.position.set(-.7, 0, 0); g.rotation.set(.1, -.2, 0); return g;
-}
-
-// Mass spectrometry: the molecule is ionised and breaks apart; sweeping m/z lets one
-// fragment through to the detector at a time.
-function massspecExhibit(progress, parameters = {}, step = 0, time = 0) {
-  const g = new THREE.Group();
-  const V = (x, y, z) => new THREE.Vector3(x, y, z);
-  const c1 = V(-1.9, -.15, 0), c2 = V(-.75, .35, 0), oO = V(.4, -.1, 0);
-  const parts = {
-    ch3: [atom(g, c1.toArray(), .24, C.carbon, 'CH3 fragment', { roughness: .3 })],
-    ch2: [atom(g, c2.toArray(), .24, C.carbon, 'CH2OH fragment', { roughness: .3 })],
-    oh: [atom(g, oO.toArray(), .27, C.oxygen, 'CH2OH fragment', { roughness: .3 })],
-  };
-  const addH = (base, dirs, len, bucket, part) => dirs.forEach((d) => {
-    const p = base.clone().addScaledVector(d.clone().normalize(), len);
-    bucket.push(atom(g, p.toArray(), .14, C.hydrogen, part, { roughness: .4 }));
-    bond(g, base.toArray(), p.toArray(), .033, 0x767c79, part);
-  });
-  addH(c1, [V(-.7, .7, .3), V(-.8, -.5, -.35), V(-.25, -.55, .8)], .82, parts.ch3, 'CH3 fragment');
-  addH(c2, [V(-.1, .9, .5), V(.05, .85, -.6)], .82, parts.ch2, 'CH2OH fragment');
-  addH(oO, [V(.85, .6, 0)], .78, parts.oh, 'CH2OH fragment');
-  bond(g, c1.toArray(), c2.toArray(), .05, 0x69736f, 'CH3 fragment');
-  bond(g, c2.toArray(), oO.toArray(), .05, 0x69736f, 'CH2OH fragment');
-  const detector = new THREE.Mesh(new THREE.BoxGeometry(.16, 1.9, 1.2), material(0x8a938f, { roughness: .4, metalness: .3 }));
-  detector.position.set(2.6, 0, 0); tag(detector, 'Detector'); g.add(detector);
-  const detLabel = labelSprite('detector', '#c7d0cc', .3); detLabel.position.set(2.6, 1.3, 0); g.add(detLabel);
-  const blip = atom(g, [2.35, 0, 0], .14, 0xe0ad35, 'Detector', { emissive: 0xe0ad35, emissiveIntensity: .8 });
+  const ch3 = mk(c1, [V(-.6, .75, .3), V(-.75, -.5, -.35), V(-.2, -.5, .8)], .82, 0x6f9fb5, 'CH3 protons', .32);
+  const ch2 = mk(c2, [V(-.1, .9, .5), V(.05, .85, -.6)], .82, 0x7fae74, 'CH2 protons', .19);
+  const oh = mk(oO, [V(.85, .6, 0)], .78, 0xd0904a, 'OH proton', .24);
+  for (let i = -1; i <= 1; i += 1) {
+    arrow(g, [-2.75 + i * .34, -1.25, 0], [-2.75 + i * .34, 1.15, 0], 0x8fa0b8, 'B0 field');
+  }
+  const b0L = labelSprite('B₀', '#b7c6da', .22); b0L.position.set(-2.75, 1.45, 0); tag(b0L, 'B0 field'); g.add(b0L);
+  const shieldNote = labelSprite('big cloud = shielded = upfield', '#9fd0e0', .5); shieldNote.position.set(.95, -1.75, 0); g.add(shieldNote);
   const caps = {
-    15: labelSprite('m/z 15 · CH3+ · methyl fragment', '#9fd0e0', .58),
-    31: labelSprite('m/z 31 · CH2OH+ · base peak', '#8fd08a', .56),
-    45: labelSprite('m/z 45 · M-H · lost one hydrogen', '#eda079', .58),
-    46: labelSprite('m/z 46 · M+ · the whole molecule', '#e7c96a', .6),
+    ch2: labelSprite('CH₂ · δ 3.69 · 2H · quartet · O strips its shielding', '#8fd08a', .6),
+    oh: labelSprite('OH · δ ~2.6 · 1H · broad singlet (exchanges)', '#eda079', .54),
+    ch3: labelSprite('CH₃ · δ 1.22 · 3H · triplet · most shielded', '#9fd0e0', .54),
   };
-  Object.values(caps).forEach((c) => { c.position.set(0, -1.75, 0); g.add(c); });
-  const peaks = [
-    { p: .25, mz: 15, keep: ['ch3'] },
-    { p: .517, mz: 31, keep: ['ch2', 'oh'] },
-    { p: .75, mz: 45, keep: ['ch3', 'ch2', 'oh'] },
-    { p: .767, mz: 46, keep: ['ch3', 'ch2', 'oh'] },
+  Object.values(caps).forEach((c) => { c.position.set(.95, -1.75, 0); g.add(c); });
+  const envs = [
+    { p: (10 - 3.69) / 10, key: 'ch2', group: ch2 },
+    { p: (10 - 2.6) / 10, key: 'oh', group: oh },
+    { p: (10 - 1.22) / 10, key: 'ch3', group: ch3 },
   ];
 
-  g.userData.update = (value, params, stepIndex, tt = 0) => {
-    let hit = null, hitAmp = 0;
-    peaks.forEach((pk) => {
-      const amp = Math.exp(-Math.pow((value - pk.p) / .022, 2));
-      if (amp > hitAmp) { hitAmp = amp; hit = pk; }
-    });
-    Object.values(caps).forEach((c) => { c.visible = false; });
-    if (hit && hitAmp > .4) caps[hit.mz].visible = true;
-    Object.entries(parts).forEach(([key, meshes]) => {
-      const selected = hit && hitAmp > .4 && hit.keep.includes(key);
-      meshes.forEach((m) => {
-        m.material.emissive = new THREE.Color(selected ? 0xe0ad35 : 0x000000);
-        m.material.emissiveIntensity = selected ? .5 : 0;
+  return (value, tt2) => {
+    let anyHit = false;
+    envs.forEach((e) => {
+      const amp = Math.exp(-Math.pow((value - e.p) / .03, 2));
+      caps[e.key].visible = amp > .45;
+      if (amp > .45) anyHit = true;
+      e.group.forEach((h, i) => {
+        h.mesh.material.emissiveIntensity = .1 + amp * 1.3;
+        const wob = amp * .1;
+        h.mesh.position.copy(h.home).add(V(Math.cos(tt2 * 7 + i * 2) * wob, 0, Math.sin(tt2 * 7 + i * 2) * wob));
+        h.cloud.position.copy(h.mesh.position);
+        h.cloud.material.opacity = .3 + amp * .3;
       });
     });
-    blip.visible = hitAmp > .4;
-    blip.material.emissiveIntensity = .3 + hitAmp * .9;
-    blip.scale.setScalar(.7 + hitAmp * .8);
+    shieldNote.visible = !anyHit;
   };
-  g.userData.update(progress, parameters, step, time);
-  g.scale.setScalar(.66); g.position.set(-.4, 0, 0); g.rotation.set(.1, -.16, 0); return g;
 }
 
-// XRD: sweep the incidence angle. Rays reflecting from successive lattice planes travel
-// an extra 2d.sin(theta); when that equals a whole number of wavelengths they add up.
-function xrdExhibit(progress, parameters = {}, step = 0, time = 0) {
-  const g = new THREE.Group();
+// Mass spec -- the molecule ACTUALLY breaks. The selected fragment flies to the detector and
+// the neutral radical drifts away; at m/z 31 you watch the C=O pi bond form (the oxocarbenium).
+function massspecScene(g, progress, tt) {
   const V = (x, y, z) => new THREE.Vector3(x, y, z);
-  const d = 1.15;                 // plane spacing
-  const ratio = .35;              // lambda / 2d
+  const c1 = V(-1.75, -.2, 0), c2 = V(-.6, .3, 0), oO = V(.55, -.15, 0);
+  const left = new THREE.Group(); const right = new THREE.Group();
+  g.add(left, right);
+  const cA = atom(left, c1.toArray(), .24, C.carbon, 'Methyl fragment', { roughness: .3 });
+  const cB = atom(right, c2.toArray(), .24, C.carbon, 'Oxocarbenium', { roughness: .3 });
+  const oX = atom(right, oO.toArray(), .28, C.oxygen, 'Oxocarbenium', { roughness: .3 });
+  const addH = (parent, base, dirs, len, part) => dirs.forEach((d) => {
+    const p = base.clone().addScaledVector(d.clone().normalize(), len);
+    atom(parent, p.toArray(), .13, C.hydrogen, part, { roughness: .4 });
+    bond(parent, base.toArray(), p.toArray(), .03, 0x767c79, part);
+  });
+  addH(left, c1, [V(-.7, .7, .3), V(-.8, -.5, -.35), V(-.25, -.55, .8)], .8, 'Methyl fragment');
+  addH(right, c2, [V(-.05, .9, .55), V(.1, .85, -.6)], .8, 'Oxocarbenium');
+  addH(right, oO, [V(.85, .6, 0)], .76, 'Oxocarbenium');
+  bond(right, c2.toArray(), oO.toArray(), .05, 0x69736f, 'Oxocarbenium');
+  const ccBond = animatedMechanismBond(g, 0x69736f, .05, 'Alpha cleavage');   // the bond that breaks
+  const coPi = animatedMechanismBond(right, 0x67a85f, .036, 'Oxocarbenium');  // C=O pi forms
+  const detector = new THREE.Mesh(new THREE.BoxGeometry(.16, 2.0, 1.0), material(0x8a938f, { roughness: .4, metalness: .3 }));
+  detector.position.set(2.85, 0, 0); tag(detector, 'Detector'); g.add(detector);
+  const detL = labelSprite('detector', '#c7d0cc', .32); detL.position.set(2.85, 1.35, 0); g.add(detL);
+  const blip = atom(g, [2.55, 0, 0], .15, 0xe0ad35, 'Detector', { emissive: 0xe0ad35, emissiveIntensity: .9 });
+  const ionLabel = labelSprite('M⁺• radical cation · m/z 46', '#e7c96a', .78); ionLabel.position.set(-.5, 1.6, 0); tag(ionLabel, 'Molecular ion'); g.add(ionLabel);
+  const caps = {
+    46: labelSprite('M⁺• intact · only 23% · the ion is fragile', '#e7c96a', .56),
+    31: labelSprite('α-cleavage → CH₂=OH⁺ · O donates a lone pair · BASE PEAK', '#8fd08a', .66),
+    45: labelSprite('M–H · lost one hydrogen · 42%', '#eda079', .48),
+    15: labelSprite('CH₃⁺ · no lone pair to help it · only 8%', '#c98f8f', .56),
+  };
+  Object.values(caps).forEach((c) => { c.position.set(.95, -1.95, 0); g.add(c); });
+  const frags = [
+    { p: 15 / 60, mz: 15, fly: 'left' },
+    { p: 31 / 60, mz: 31, fly: 'right' },
+    { p: 45 / 60, mz: 45, fly: 'both' },
+    { p: 46 / 60, mz: 46, fly: 'both' },
+  ];
+
+  return (value, tt2) => {
+    let hit = null, amp = 0;
+    frags.forEach((f) => {
+      const a = Math.exp(-Math.pow((value - f.p) / .016, 2));
+      if (a > amp) { amp = a; hit = f; }
+    });
+    const on = !!hit && amp > .45;
+    Object.values(caps).forEach((c) => { c.visible = false; });
+    if (on) caps[hit.mz].visible = true;
+    const broken = on && (hit.fly === 'left' || hit.fly === 'right');
+    const sep = broken ? amp : 0;
+    // the selected half flies to the detector; the neutral radical drifts away
+    if (broken && hit.fly === 'right') {
+      right.position.set(sep * 1.35, 0, 0); left.position.set(-sep * .55, -sep * .35, 0);
+    } else if (broken && hit.fly === 'left') {
+      left.position.set(sep * 2.5, sep * .05, 0); right.position.set(-sep * .35, -sep * .45, 0);
+    } else { right.position.set(0, 0, 0); left.position.set(0, 0, 0); }
+    const lOpacity = broken && hit.fly === 'right' ? 1 - sep * .55 : 1;
+    left.traverse((o) => { if (o.material) { o.material.transparent = true; o.material.opacity = lOpacity; } });
+    ccBond(c1.clone().add(left.position), c2.clone().add(right.position), broken ? Math.max(0, 1 - sep * 2.2) : 1);
+    // the oxocarbenium: oxygen lone pair becomes a full C=O pi bond
+    const oxo = on && hit.mz === 31 ? amp : 0;
+    coPi(c2.clone().add(V(0, 0, .14)), oO.clone().add(V(0, 0, .14)), oxo);
+    ionLabel.visible = on && hit.mz === 46;
+    blip.visible = on;
+    blip.material.emissiveIntensity = .3 + amp;
+    blip.scale.setScalar(.6 + amp * .9);
+  };
+}
+
+// XRD -- the two reflected beams are drawn as REAL waves whose phase comes from their actual
+// path length. When 2d.sin(theta) = n.lambda the crests line up on screen; otherwise they cancel.
+function xrdScene(g, progress, tt) {
+  const V = (x, y, z) => new THREE.Vector3(x, y, z);
+  const d = 1.25, ratio = 1.5406 / (2 * 2.82);   // lambda / 2d for NaCl + Cu K-alpha
+  const yTop = .2, yBot = yTop - d;
   for (let row = 0; row < 2; row += 1) {
     for (let i = -3; i <= 3; i += 1) {
-      atom(g, [i * .78, -row * d - .5, 0], .19, row === 0 ? 0x8c68b3 : 0x6f9fb5, 'Lattice planes', { roughness: .34 });
+      atom(g, [i * .8, row === 0 ? yTop : yBot, 0], .2, row === 0 ? 0x8c68b3 : 0x6f9fb5, 'Lattice planes', { roughness: .34 });
     }
   }
-  const planeA = new THREE.Mesh(new THREE.PlaneGeometry(5.4, .02), material(0xd0a947, { transparent: true, opacity: .5 }));
-  planeA.position.set(0, -.5, 0); tag(planeA, 'Lattice planes'); g.add(planeA);
-  const planeB = new THREE.Mesh(new THREE.PlaneGeometry(5.4, .02), material(0xd0a947, { transparent: true, opacity: .5 }));
-  planeB.position.set(0, -d - .5, 0); tag(planeB, 'Lattice planes'); g.add(planeB);
-  const mkRay = (color) => {
-    const geo = new THREE.BufferGeometry().setFromPoints([V(0, 0, 0), V(0, 0, 0)]);
-    const line = new THREE.Line(geo, new THREE.LineBasicMaterial({ color, transparent: true, opacity: .9 }));
-    tag(line, 'X-ray beam'); g.add(line);
-    return (a, b) => { const pos = line.geometry.attributes.position; pos.setXYZ(0, a.x, a.y, a.z); pos.setXYZ(1, b.x, b.y, b.z); pos.needsUpdate = true; };
-  };
-  const inA = mkRay(0xc94d68), outA = mkRay(0xc94d68), inB = mkRay(0x5f8fa8), outB = mkRay(0x5f8fa8);
-  const spot = atom(g, [0, 0, 0], .2, 0xe0ad35, 'Detector spot', { emissive: 0xe0ad35, emissiveIntensity: .2 });
-  const spotLabel = labelSprite('detector', '#c7d0cc', .3); g.add(spotLabel);
-  const capBright = labelSprite('2d sin(theta) = n x lambda -> waves in phase -> bright spot', '#8fd08a', .74); capBright.position.set(0, -2.55, 0); g.add(capBright);
-  const capDark = labelSprite('path difference is not a whole wavelength -> waves cancel', '#a9b3b0', .7); capDark.position.set(0, -2.55, 0); g.add(capDark);
+  [yTop, yBot].forEach((y) => {
+    const pl = new THREE.Mesh(new THREE.PlaneGeometry(5.8, .02), material(0xd0a947, { transparent: true, opacity: .45 }));
+    pl.position.set(0, y, 0); tag(pl, 'Lattice planes'); g.add(pl);
+  });
+  const dLabel = labelSprite('d = 2.82 Å', '#e7c96a', .42); dLabel.position.set(-2.9, (yTop + yBot) / 2, 0); tag(dLabel, 'Lattice planes'); g.add(dLabel);
+  const inA = waveBeam(g, 0xc94d68, 'X-ray beam'); const outA = waveBeam(g, 0xc94d68, 'X-ray beam');
+  const inB = waveBeam(g, 0x5f8fa8, 'X-ray beam'); const outB = waveBeam(g, 0x5f8fa8, 'X-ray beam');
+  const spot = atom(g, [0, 0, 0], .22, 0xe0ad35, 'Bragg reflection', { emissive: 0xe0ad35, emissiveIntensity: .2 });
+  const capBright = labelSprite('extra path = whole number of λ · IN STEP · bright', '#8fd08a', .62); capBright.position.set(.95, -2.3, 0); g.add(capBright);
+  const capDark = labelSprite('extra path is not a whole λ · out of step · dark', '#a9b3b0', .6); capDark.position.set(.95, -2.3, 0); g.add(capDark);
+  const pathLabel = labelSprite('extra path 2d·sinθ', '#e7c96a', .6); tag(pathLabel, 'Path difference'); g.add(pathLabel);
 
-  g.userData.update = (value, params, stepIndex, tt = 0) => {
-    const theta = value * 60 * Math.PI / 180;
-    const st = Math.max(.02, Math.sin(theta)), ct = Math.cos(theta);
-    const R = 2.5;
-    const hitA = V(-.4, -.5, 0), hitB = V(.4, -d - .5, 0);
-    // beam enters from the upper right and reflects to the upper left, so the detector
-    // spot lands in open space rather than behind the spectrum panel
-    inA(hitA.clone().add(V(ct * R, st * R, 0)), hitA);
-    outA(hitA, hitA.clone().add(V(-ct * R, st * R, 0)));
-    inB(hitB.clone().add(V(ct * R, st * R, 0)), hitB);
-    outB(hitB, hitB.clone().add(V(-ct * R, st * R, 0)));
-    const phase = Math.sin(theta) / ratio;                 // path difference in wavelengths
-    const intensity = Math.pow(Math.cos(Math.PI * phase), 2);
-    spot.position.copy(hitA.clone().add(V(-ct * R, st * R, 0)));
-    spot.material.emissiveIntensity = .1 + intensity * 1.6;
-    spot.scale.setScalar(.6 + intensity * .9);
-    spotLabel.position.copy(spot.position).add(V(0, .5, 0));
-    const bright = intensity > .82 && value > .06;
-    capBright.visible = bright;
-    capDark.visible = !bright;
+  return (value, tt2) => {
+    const theta = Math.max(.035, value * 60 * Math.PI / 180);
+    const st = Math.sin(theta), ct = Math.cos(theta);
+    const R = 2.9;
+    const hitA = V(-.45, yTop, 0), hitB = V(.45, yBot, 0);
+    const inDir = V(ct, st, 0), outDir = V(-ct, st, 0);
+    // phase advances with real optical path; beam B travels an extra 2d.sin(theta)
+    const extra = 2 * d * st;          // extra path in scene units
+    const wl = 2 * d * ratio;          // makes extra/wl == the REAL 2d.sin(theta)/lambda exactly
+    const ph = -tt2 * 6;
+    inA(hitA.clone().addScaledVector(inDir, R), hitA, wl, ph, .12, .95);
+    outA(hitA, hitA.clone().addScaledVector(outDir, R), wl, ph, .12, .95);
+    inB(hitB.clone().addScaledVector(inDir, R), hitB, wl, ph, .12, .95);
+    outB(hitB, hitB.clone().addScaledVector(outDir, R), wl, ph - (2 * Math.PI * extra / wl), .12, .95);
+    const path = extra / wl;                          // path difference in wavelengths
+    const intensity = Math.pow(Math.cos(Math.PI * path), 2);
+    const tip = hitA.clone().addScaledVector(outDir, R);
+    spot.position.copy(tip);
+    spot.material.emissiveIntensity = .1 + intensity * 1.8;
+    spot.scale.setScalar(.55 + intensity * 1.0);
+    pathLabel.position.set(.0, (yTop + yBot) / 2 - .38, 0);
+    const bright = intensity > .9 && value > .05;
+    capBright.visible = bright; capDark.visible = !bright;
   };
-  g.userData.update(progress, parameters, step, time);
-  g.scale.setScalar(.62); g.position.set(-.5, -.1, 0); g.rotation.set(.02, -.05, 0); return g;
 }
 
-// Fluorescence: absorb, lose some energy as vibration, then emit. The emitted photon is
-// always lower energy (longer wavelength) than the absorbed one - the Stokes shift.
-function fluorescenceExhibit(progress, parameters = {}, step = 0, time = 0) {
-  const g = new THREE.Group();
+// Fluorescence -- a clean, flat Jablonski diagram. The absorption arrow is visibly LONGER than
+// the emission arrow: that difference IS the Stokes shift.
+function fluorScene(g, progress, tt) {
   const V = (x, y, z) => new THREE.Vector3(x, y, z);
-  const s0 = -1.5, s1 = 1.15, vib = .3;
-  const level = (y, w, strong, part) => {
-    const m = new THREE.Mesh(new THREE.BoxGeometry(w, .045, .05), material(strong ? 0x7f8a87 : 0xa9b3b0, { emissive: 0x3a4341, emissiveIntensity: strong ? .25 : .08 }));
+  const s0 = -1.6, s1 = 1.05, vib = .33;
+  const mkLevel = (y, w, strong, part) => {
+    const m = new THREE.Mesh(new THREE.BoxGeometry(w, strong ? .06 : .035, .04), material(strong ? 0x6d7a76 : 0xa9b3b0, { emissive: 0x3a4341, emissiveIntensity: strong ? .3 : .1 }));
     m.position.set(0, y, 0); tag(m, part); g.add(m); return m;
   };
   for (let v = 0; v < 3; v += 1) {
-    level(s0 + v * vib, v === 0 ? 1.9 : 1.6, v === 0, 'Ground state');
-    level(s1 + v * vib, v === 0 ? 1.9 : 1.6, v === 0, 'Excited state');
+    mkLevel(s0 + v * vib, v === 0 ? 3.0 : 2.5, v === 0, 'Ground state');
+    mkLevel(s1 + v * vib, v === 0 ? 3.0 : 2.5, v === 0, 'Excited state');
   }
-  const s0Label = labelSprite('S0 ground state', '#c7d0cc', .48); s0Label.position.set(-1.85, s0, 0); tag(s0Label, 'Ground state'); g.add(s0Label);
-  const s1Label = labelSprite('S1 excited state', '#c7d0cc', .48); s1Label.position.set(-1.85, s1, 0); tag(s1Label, 'Excited state'); g.add(s1Label);
-  const electron = atom(g, [0, s0, 0], .13, 0xe0ad35, 'Electron', { emissive: 0xe0ad35, emissiveIntensity: .8 });
-  const photonIn = atom(g, [0, 0, 0], .18, 0x5a6fd0, 'Absorbed photon', { emissive: 0x5a6fd0, emissiveIntensity: .8 });
-  const photonOut = atom(g, [0, 0, 0], .18, 0x3f9e6a, 'Emitted photon', { emissive: 0x3f9e6a, emissiveIntensity: .8 });
-  const capAbsorb = labelSprite('absorbs a blue photon -> jumps to S1', '#8ea0e8', .6); capAbsorb.position.set(0, -2.05, 0); g.add(capAbsorb);
-  const capRelax = labelSprite('loses energy as vibration (no light emitted)', '#e7c96a', .64); capRelax.position.set(0, -2.05, 0); g.add(capRelax);
-  const capEmit = labelSprite('emits a lower-energy photon -> Stokes shift', '#8fd08a', .66); capEmit.position.set(0, -2.05, 0); g.add(capEmit);
-
-  g.userData.update = (value, params, stepIndex, tt = 0) => {
-    const absorbed = THREE.MathUtils.smoothstep(value, .18, .32);
-    const relaxed = THREE.MathUtils.smoothstep(value, .38, .6);
-    const emitted = THREE.MathUtils.smoothstep(value, .66, .82);
-    // electron: S0(v=0) -> S1(v=2) -> S1(v=0) -> S0(v=0)
-    const yUp = THREE.MathUtils.lerp(s0, s1 + 2 * vib, absorbed);
-    const yRelax = THREE.MathUtils.lerp(yUp, s1, relaxed);
-    const y = THREE.MathUtils.lerp(yRelax, s0, emitted);
-    const jitter = relaxed > .05 && relaxed < .95 ? Math.sin(tt * 22) * .05 : 0;
-    electron.position.set(0, y + jitter, 0);
-    photonIn.visible = value < .34;
-    photonIn.position.set(-2.4 + Math.min(value / .3, 1) * 2.3, s0 + .2, 0);
-    photonOut.visible = value > .66;
-    photonOut.position.set(Math.max(0, emitted) * 2.3, s0 + .35 - emitted * .2, 0);
-    capAbsorb.visible = value < .36;
-    capRelax.visible = value >= .36 && value < .64;
-    capEmit.visible = value >= .64;
+  const s0L = labelSprite('S₀', '#c7d0cc', .24); s0L.position.set(-1.95, s0, 0); tag(s0L, 'Ground state'); g.add(s0L);
+  const s1L = labelSprite('S₁', '#c7d0cc', .24); s1L.position.set(-1.95, s1, 0); tag(s1L, 'Excited state'); g.add(s1L);
+  const absArrow = liveArrow(g, 0x5a6fd0, 'Absorbed photon', .04, .15);
+  const emArrow = liveArrow(g, 0x3f9e6a, 'Emitted photon', .04, .15);
+  const relax1 = waveBeam(g, 0xe7c96a, 'Electron');
+  const relax2 = waveBeam(g, 0xe7c96a, 'Electron');
+  const dot = atom(g, [0, s0, 0], .14, 0xe0ad35, 'Electron', { emissive: 0xe0ad35, emissiveIntensity: .9 });
+  const absL = labelSprite('absorb 490 nm', '#8ea0e8', .58); absL.position.set(-1.2, (s0 + s1) / 2 + .3, 0); tag(absL, 'Absorbed photon'); g.add(absL);
+  const emL = labelSprite('emit 514 nm', '#8fd08a', .52); emL.position.set(1.35, (s0 + s1) / 2 + .1, 0); tag(emL, 'Emitted photon'); g.add(emL);
+  const heatL = labelSprite('heat (no light)', '#e7c96a', .56); heatL.position.set(.62, s1 + vib, 0); g.add(heatL);
+  const stokesL = labelSprite('shorter arrow = less energy = the Stokes shift', '#8fd08a', .62); stokesL.position.set(.95, -2.75, 0); tag(stokesL, 'Stokes shift'); g.add(stokesL);
+  const caps = {
+    a: labelSprite('absorption ~10⁻¹⁵ s · lands HIGH in S₁ (Franck-Condon)', '#8ea0e8', .64),
+    b: labelSprite('vibrational relaxation ~10⁻¹² s · 1000× faster than emission', '#e7c96a', .66),
+    c: labelSprite('emission ~10⁻⁹ s · lands HIGH in S₀ · energy lost twice', '#8fd08a', .64),
   };
-  g.userData.update(progress, parameters, step, time);
-  g.scale.setScalar(.68); g.position.set(-.55, 0, 0); g.rotation.set(.04, -.06, 0); return g;
+  Object.values(caps).forEach((c) => { c.position.set(.95, -2.2, 0); g.add(c); });
+
+  return (value, tt2) => {
+    const absorbed = THREE.MathUtils.smoothstep(value, .16, .3);
+    const relaxed = THREE.MathUtils.smoothstep(value, .36, .58);
+    const emitted = THREE.MathUtils.smoothstep(value, .66, .8);
+    const relaxed2 = THREE.MathUtils.smoothstep(value, .85, .98);
+    const topS1 = s1 + 2 * vib;     // absorption lands here (Franck-Condon)
+    const topS0 = s0 + 2 * vib;     // emission lands here -- NOT at the bottom
+    let y = s0;
+    if (value < .3) y = THREE.MathUtils.lerp(s0, topS1, absorbed);
+    else if (value < .62) y = THREE.MathUtils.lerp(topS1, s1, relaxed);
+    else if (value < .84) y = THREE.MathUtils.lerp(s1, topS0, emitted);
+    else y = THREE.MathUtils.lerp(topS0, s0, relaxed2);
+    const jitter = (relaxed > .05 && relaxed < .95) || (relaxed2 > .05 && relaxed2 < .95) ? Math.sin(tt2 * 24) * .045 : 0;
+    dot.position.set(0, y + jitter, 0);
+    // absorption arrow: S0(v=0) -> S1(v=2). Emission arrow: S1(v=0) -> S0(v=2). Shorter!
+    absArrow(V(-.85, s0, 0), V(-.85, topS1, 0), value < .34 ? 1 : .2);
+    emArrow(V(.85, s1, 0), V(.85, topS0, 0), value > .6 ? 1 : .12);
+    absL.visible = value < .4; emL.visible = value > .6;
+    relax1(V(.18, topS1, 0), V(.18, s1, 0), .22, -tt2 * 9, .07, value >= .3 && value < .66 ? .95 : .12);
+    relax2(V(.18, topS0, 0), V(.18, s0, 0), .22, -tt2 * 9, .07, value > .84 ? .95 : .1);
+    heatL.visible = value >= .3 && value < .66;
+    stokesL.visible = value > .6;
+    caps.a.visible = value < .34;
+    caps.b.visible = value >= .34 && value < .64;
+    caps.c.visible = value >= .64;
+  };
 }
 
-const builders = { battery: batteryExhibit, binding, snowflake: snowflakeExhibit, catalyst: catalystExhibit, smell, mechanism, orbitals, geometry, lattice: latticeExhibit, electrochem: electrochemExhibit, synthesis: synthesisExhibit, ir: irExhibit, raman: ramanExhibit, uvvis: uvvisExhibit, nmr: nmrExhibit, massspec: massspecExhibit, xrd: xrdExhibit, fluorescence: fluorescenceExhibit };
+const TECHNIQUE_SCENES = { ir: irScene, raman: ramanScene, uvvis: uvvisScene, nmr: nmrScene, massspec: massspecScene, xrd: xrdScene, fluorescence: fluorScene };
+// Diagram-style techniques are viewed dead-on: perspective skew makes an energy-level diagram
+// look like a pile of sticks.
+const TECHNIQUE_FLAT = new Set(['uvvis', 'xrd', 'fluorescence']);
+
+function analysisExhibit(progress, parameters = {}, step = 0, time = 0) {
+  const g = new THREE.Group();
+  const id = parameters.techniqueId || 'ir';
+  const build = TECHNIQUE_SCENES[id] || irScene;
+  const tick = build(g, progress, time);
+  g.userData.update = (value, params = {}, stepIndex, tt = 0) => tick(value, tt, params);
+  g.userData.update(progress, parameters, step, time);
+  const scale = { ir: .8, raman: .66, uvvis: .62, nmr: .72, massspec: .64, xrd: .64, fluorescence: .68 }[id] || .75;
+  g.scale.setScalar(scale);
+  const shift = { nmr: -.75, massspec: -.35, raman: -.3, ir: -.2 }[id] || 0;
+  g.position.set(shift, 0, 0);
+  if (TECHNIQUE_FLAT.has(id)) g.rotation.set(0, 0, 0);
+  else g.rotation.set(.09, -.15, 0);
+  return g;
+}
+
+const builders = { battery: batteryExhibit, binding, snowflake: snowflakeExhibit, catalyst: catalystExhibit, smell, mechanism, orbitals, geometry, lattice: latticeExhibit, electrochem: electrochemExhibit, synthesis: synthesisExhibit, analysis: analysisExhibit };
 const discreteBuilders = new Set(['orbitals', 'geometry', 'lattice']);
 const discreteModelKey = (lessonId, value) => ['geometry', 'orbitals', 'lattice'].includes(lessonId) ? Math.round(value * 2) / 2 : (value >= .5 ? 1 : 0);
 const cameraViews = {
@@ -2834,13 +2961,7 @@ const cameraViews = {
   lattice: [[4.7,3.2,7.5],[4.1,2.7,6.7],[5.3,3.7,8.4],[5.1,3.4,8.1]],
   electrochem: [[5.2,3.2,8.5],[4.8,2.7,7.8],[4.8,2.7,7.8],[5.3,3.4,8.4]],
   synthesis: [[5.4,3.0,9.0],[4.95,2.75,8.35],[5.2,3.05,8.7],[4.9,2.8,8.3]],
-  ir: [[.6,1.4,8.2],[.6,1.4,8.2],[.6,1.4,8.2],[.6,1.4,8.2]],
-  raman: [[.5,1.3,8.6],[.5,1.3,8.6],[.5,1.3,8.6],[.5,1.3,8.6]],
-  uvvis: [[.4,1.2,8.8],[.4,1.2,8.8],[.4,1.2,8.8],[.4,1.2,8.8]],
-  nmr: [[.6,1.5,8.2],[.6,1.5,8.2],[.6,1.5,8.2],[.6,1.5,8.2]],
-  massspec: [[.5,1.4,8.8],[.5,1.4,8.8],[.5,1.4,8.8],[.5,1.4,8.8]],
-  xrd: [[.3,1.0,9.2],[.3,1.0,9.2],[.3,1.0,9.2],[.3,1.0,9.2]],
-  fluorescence: [[.3,1.0,8.6],[.3,1.0,8.6],[.3,1.0,8.6],[.3,1.0,8.6]],
+  analysis: [[.4,1.0,8.8],[.4,1.0,8.8],[.4,1.0,8.8],[.4,1.0,8.8]],
 };
 const cameraTargets = {
   battery: [[0,-.45,0],[0,-.45,0],[0,-.45,0],[0,-.45,0]],
@@ -2852,13 +2973,25 @@ const cameraTargets = {
   lattice: [[.55,-.55,0],[.55,-.55,0],[.55,-.55,0],[0,0,0]],
   electrochem: [[-.55,-.45,0],[-.55,-.45,0],[.8,-.45,0],[.4,.1,0]],
   synthesis: [[0,.1,0],[-.8,-.15,0],[.85,-.2,0],[.72,.35,0]],
-  ir: [[0,.1,0],[0,.1,0],[0,.1,0],[0,.1,0]],
-  raman: [[0,0,0],[0,0,0],[0,0,0],[0,0,0]],
-  uvvis: [[0,-.2,0],[0,-.2,0],[0,-.2,0],[0,-.2,0]],
-  nmr: [[0,-.1,0],[0,-.1,0],[0,-.1,0],[0,-.1,0]],
-  massspec: [[0,-.15,0],[0,-.15,0],[0,-.15,0],[0,-.15,0]],
+  analysis: [[0,-.1,0],[0,-.1,0],[0,-.1,0],[0,-.1,0]],
+};
+const analysisCameraViews = {
+  ir: [[.4,1.0,8.6],[.4,1.0,8.6],[.4,1.0,8.6],[.4,1.0,8.6]],
+  raman: [[.3,.9,9.6],[.3,.9,9.6],[.3,.9,9.6],[.3,.9,9.6]],
+  uvvis: [[0,0,10.8],[0,0,10.8],[0,0,10.8],[0,0,10.8]],
+  nmr: [[.5,1.2,8.6],[.5,1.2,8.6],[.5,1.2,8.6],[.5,1.2,8.6]],
+  massspec: [[.4,1.0,9.8],[.4,1.0,9.8],[.4,1.0,9.8],[.4,1.0,9.8]],
+  xrd: [[0,0,9.8],[0,0,9.8],[0,0,9.8],[0,0,9.8]],
+  fluorescence: [[0,0,9.6],[0,0,9.6],[0,0,9.6],[0,0,9.6]],
+};
+const analysisCameraTargets = {
+  ir: [[0,-.15,0],[0,-.15,0],[0,-.15,0],[0,-.15,0]],
+  raman: [[0,-.1,0],[0,-.1,0],[0,-.1,0],[0,-.1,0]],
+  uvvis: [[0,.1,0],[0,.1,0],[0,.1,0],[0,.1,0]],
+  nmr: [[-.3,-.25,0],[-.3,-.25,0],[-.3,-.25,0],[-.3,-.25,0]],
+  massspec: [[.2,-.15,0],[.2,-.15,0],[.2,-.15,0],[.2,-.15,0]],
   xrd: [[0,-.55,0],[0,-.55,0],[0,-.55,0],[0,-.55,0]],
-  fluorescence: [[0,-.3,0],[0,-.3,0],[0,-.3,0],[0,-.3,0]],
+  fluorescence: [[0,-.4,0],[0,-.4,0],[0,-.4,0],[0,-.4,0]],
 };
 const mechanismCameraViews = {
   sn2: [[5.4,2.5,8],[4.4,2.1,6.8],[4.1,1.7,6.4],[5.2,2.8,7.7]],
@@ -2992,10 +3125,14 @@ export default function ChemScene({ lessonId, sceneVariant = '', progress, progr
         camera: new THREE.Vector3(4.8, 2.95, 10.4),
         target: new THREE.Vector3(0, -.55, 0),
       };
-      const activeCameraViews = lessonId === 'mechanism'
+      const activeCameraViews = lessonId === 'analysis'
+        ? analysisCameraViews[sceneVariantRef.current] || cameraViews.analysis
+        : lessonId === 'mechanism'
         ? mechanismCameraViews[sceneVariantRef.current] || cameraViews.mechanism
         : cameraViews[lessonId];
-      const activeCameraTargets = lessonId === 'mechanism'
+      const activeCameraTargets = lessonId === 'analysis'
+        ? analysisCameraTargets[sceneVariantRef.current] || cameraTargets.analysis
+        : lessonId === 'mechanism'
         ? mechanismCameraTargets[sceneVariantRef.current] || cameraTargets.mechanism
         : cameraTargets[lessonId];
       if (lessonId !== 'catalyst') {
@@ -3133,6 +3270,13 @@ export default function ChemScene({ lessonId, sceneVariant = '', progress, progr
         camera.position.copy(state.camera); controls.target.copy(state.target);
         cameraGoal = state.camera; targetGoal = state.target;
         cameraAnimating = false; cameraNeedsReset = false;
+      }
+      if (lessonId === 'analysis' && sceneVariantRef.current !== lastSceneVariant) {
+        lastSceneVariant = sceneVariantRef.current;
+        const st = cameraStateFor(0);
+        cameraGoal = st.camera; targetGoal = st.target;
+        cameraAnimating = true;
+        queueModelReplacement(0, `analysis-${lastSceneVariant}`);
       }
       if (lessonId === 'mechanism' && sceneVariantRef.current !== lastSceneVariant) {
         lastSceneVariant = sceneVariantRef.current;
