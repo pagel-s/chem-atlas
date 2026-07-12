@@ -19,12 +19,16 @@ lessons.forEach((lesson) => {
   assert(lesson.check.options.length === 3, `${lesson.id}: expected three assessment options.`);
   assert(lesson.check.explanation?.length > 30, `${lesson.id}: assessment needs evidence-based feedback.`);
 });
-assert(mechanismSpecs.length === 3, 'Mechanism exhibit must offer SN2, Suzuki, and Diels-Alder views.');
-assert(new Set(mechanismSpecs.map((spec) => spec.id)).size === 3, 'Mechanism ids must be unique.');
-assert(mechanismSpecs.some((spec) => spec.id === 'sn2') && mechanismSpecs.some((spec) => spec.id === 'suzuki') && mechanismSpecs.some((spec) => spec.id === 'dielsAlder'), 'Required mechanism variants are missing.');
+assert(mechanismSpecs.length === 7, 'Mechanism exhibit must offer seven mechanism views.');
+assert(new Set(mechanismSpecs.map((spec) => spec.id)).size === 7, 'Mechanism ids must be unique.');
+['sn2', 'suzuki', 'dielsAlder', 'e2', 'sn1', 'carbonyl', 'michael'].forEach((id) => {
+  assert(mechanismSpecs.some((spec) => spec.id === id), `Required mechanism variant is missing: ${id}.`);
+  assert(scene.includes(`parameters.mechanismId === '${id}'`) || id === 'sn2', `Mechanism scene dispatch missing for ${id}.`);
+});
 mechanismSpecs.forEach((spec) => {
   assert(spec.steps.length === 4 && spec.guidedViews.length === 4, `${spec.id}: expected four guided states.`);
   assert(spec.check.options.length === 3 && spec.check.explanation?.length > 30, `${spec.id}: assessment needs evidence-based feedback.`);
+  spec.guidedViews.forEach((view) => assert(spec.parts[view.part], `${spec.id}: guided view references undefined part ${view.part}.`));
 });
 
 assert(!app.includes('useState(.28)'), 'Discrete exhibits must not initialize in a partial state.');
@@ -103,4 +107,4 @@ assert(scene.includes('const wasCompactMode = compactMode;') && scene.includes('
 assert(pdb5mzp.includes(' CFF '), '5MZP caffeine ligand CFF is missing.');
 assert(pdb8f76.includes(' PPI '), '8F76 propionate ligand PPI is missing.');
 
-console.log('Science integrity checks passed for 11 exhibits and 3 mechanism variants.');
+console.log('Science integrity checks passed for 11 exhibits and 7 mechanism variants.');

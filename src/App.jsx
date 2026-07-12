@@ -69,6 +69,8 @@ function snowHabit(temperature, saturation) {
 }
 
 function mechanismReadout(mechanismId, progress) {
+  const spec = mechanismSpecs.find((item) => item.id === mechanismId);
+  if (spec?.readout) return spec.readout(progress);
   if (mechanismId === 'suzuki') {
     return [
       ['Catalytic stage', progress < .08 ? 'aryl partners + formal Pd(0)' : progress < .34 ? 'C-Br oxidative addition' : progress < .62 ? 'aryl transfer -> cis-diaryl Pd(II)' : progress < .72 ? 'cis-diaryl Pd(II)' : progress < .9 ? 'reductive elimination' : 'biaryl + regenerated Pd(0)'],
