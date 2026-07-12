@@ -2992,140 +2992,179 @@ function nmrScene(g, progress, tt) {
 //            left behind, greyed out - a mass spectrometer cannot detect a neutral, ever.
 function massspecScene(g, progress, tt) {
   const V = (x, y, z) => new THREE.Vector3(x, y, z);
-  const S = .62;                                   // ethanol is drawn small: it has to fit an instrument
-  const OFF = V(-2.05, -1.15, 0);
-  const put = (v) => v.clone().multiplyScalar(S).add(OFF);
+  const S = .5;                                    // ethanol has to fit inside an ion source
+  const FLIGHT_Y = -1.75;
+  const DET_X = 2.0;
+  const SRC = V(-2.35, -1.6, 0);
   const raw = ethanolGeometry();
-  const c1 = put(raw.c1), c2 = put(raw.c2), o = put(raw.o);
-  const c1H = raw.c1H.map(put);
-  const c2H = raw.c2H.map(put);
-  const oH = put(raw.oH);
-  const FLIGHT_Y = -1.15;
-  const DET_X = 1.95;
+  const put = (v) => v.clone().multiplyScalar(S).add(SRC);
 
-  // --- the vacuum chamber: a wireframe box, so source / analyser / detector read as ONE machine
-  const chamber = new THREE.LineSegments(
-    new THREE.EdgesGeometry(new THREE.PlaneGeometry(5.15, 1.75)),
-    new THREE.LineBasicMaterial({ color: 0x8a938f, transparent: true, opacity: .3 }),
-  );
-  chamber.position.set(-.4, FLIGHT_Y, 0); tag(chamber, 'Analyser'); g.add(chamber);
-  const axis = new THREE.Mesh(new THREE.CylinderGeometry(.006, .006, 5.1, 6), material(0x8a938f, { transparent: true, opacity: .3 }));
-  axis.rotation.z = Math.PI / 2; axis.position.set(-.4, FLIGHT_Y, 0); tag(axis, 'Analyser'); g.add(axis);
-
-  // --- accelerating plates: two charged electrodes with an aperture the ion flies through
-  [-.75, -.35].forEach((x, i) => {
-    [.62, -.62].forEach((dy) => {                  // split so there is a real slit on the axis
-      const plate = new THREE.Mesh(new THREE.BoxGeometry(.05, .5, .9), material(0x9aa8a4, { metalness: .5, roughness: .35, transparent: true, opacity: .55 }));
-      plate.position.set(x, FLIGHT_Y + dy, 0); tag(plate, 'Analyser'); g.add(plate);
-    });
-    const sign = labelSprite(i === 0 ? '−' : '+', i === 0 ? '#8ea0e8' : '#eda079', .38); sign.visible = true;
-    sign.position.set(x, FLIGHT_Y + 1.05, 0); tag(sign, 'Analyser'); g.add(sign);
-  });
-  const accL = labelSprite('accelerate · light ions fly fastest', '#a9bcc4', .6); accL.visible = true;
-  accL.position.set(.05, FLIGHT_Y + 1.3, 0); tag(accL, 'Analyser'); g.add(accL);
-
-  const detector = new THREE.Mesh(new THREE.BoxGeometry(.14, 1.5, 1.0), material(0x8a938f, { roughness: .4, metalness: .35 }));
-  detector.position.set(DET_X, FLIGHT_Y, 0); tag(detector, 'Detector'); g.add(detector);
-  const detL = labelSprite('detector', '#c7d0cc', .5); detL.position.set(DET_X, FLIGHT_Y - 1.2, 0); tag(detL, 'Detector'); g.add(detL); detL.visible = true;
-  const blip = new THREE.Mesh(new THREE.BoxGeometry(.05, 1.3, .04), material(0xe0ad35, { emissive: 0xe0ad35, emissiveIntensity: .9 }));
-  blip.position.set(DET_X - .1, FLIGHT_Y, .02); tag(blip, 'Detector'); g.add(blip);
-
-  // --- ionisation
-  const ionBeam = waveBeam(g, 0x5a6fd0, 'Ionisation');
-  const ejected = atom(g, [0, 0, 0], .08, 0x5a6fd0, 'Ionisation', { emissive: 0x5a6fd0, emissiveIntensity: .9 });
-  const ionL = labelSprite('e⁻ 70 eV → knocks ONE electron out', '#8ea0e8', .78);
-  ionL.position.set(-2.0, FLIGHT_Y + 1.3, 0); tag(ionL, 'Ionisation'); g.add(ionL);
-  const srcL = labelSprite('ion source', '#a9bcc4', .5); srcL.position.set(-2.05, FLIGHT_Y - 1.15, 0); tag(srcL, 'Ionisation'); g.add(srcL); srcL.visible = true;
-
-  // --- the molecule, in the two halves alpha-cleavage separates
-  const left = new THREE.Group(); const right = new THREE.Group(); g.add(left, right);
-  atom(left, c1.toArray(), .2, C.carbon, 'Methyl fragment', { roughness: .3 });
-  c1H.forEach((h) => {
-    atom(left, h.toArray(), .11, C.hydrogen, 'Methyl fragment', { roughness: .4 });
-    bond(left, c1.toArray(), h.toArray(), .035, 0x767c79, 'Methyl fragment');
-  });
-  atom(right, c2.toArray(), .2, C.carbon, 'Oxocarbenium', { roughness: .3 });
-  atom(right, o.toArray(), .23, C.oxygen, 'Oxocarbenium', { roughness: .3 });
-  c2H.forEach((h) => {
-    atom(right, h.toArray(), .11, C.hydrogen, 'Oxocarbenium', { roughness: .4 });
-    bond(right, c2.toArray(), h.toArray(), .035, 0x767c79, 'Oxocarbenium');
-  });
-  atom(right, oH.toArray(), .11, C.hydrogen, 'Oxocarbenium', { roughness: .4 });
-  bond(right, o.toArray(), oH.toArray(), .035, 0x767c79, 'Oxocarbenium');
-  const coBond = orderBond(right, 0x45504d, .05, 'Oxocarbenium');
-  const ccBond = animatedMechanismBond(g, 0x69736f, .054, 'Alpha cleavage');
+  // ONE MESH PER ATOM. The old scene split ethanol into a fixed left/right half, which meant
+  // m/z 45 (loss of H) could not be drawn at all and rendered as the intact m/z 46 molecule.
+  const A = {
+    c1: { p: put(raw.c1), r: .19, c: C.carbon, part: 'Methyl fragment' },
+    h1a: { p: put(raw.c1H[0]), r: .1, c: C.hydrogen, part: 'Methyl fragment' },
+    h1b: { p: put(raw.c1H[1]), r: .1, c: C.hydrogen, part: 'Methyl fragment' },
+    h1c: { p: put(raw.c1H[2]), r: .1, c: C.hydrogen, part: 'Methyl fragment' },
+    c2: { p: put(raw.c2), r: .19, c: C.carbon, part: 'Oxocarbenium' },
+    h2a: { p: put(raw.c2H[0]), r: .1, c: C.hydrogen, part: 'Oxocarbenium' },   // the H lost at m/z 45
+    h2b: { p: put(raw.c2H[1]), r: .1, c: C.hydrogen, part: 'Oxocarbenium' },
+    o: { p: put(raw.o), r: .22, c: C.oxygen, part: 'Oxocarbenium' },
+    ho: { p: put(raw.oH), r: .1, c: C.hydrogen, part: 'Oxocarbenium' },
+  };
+  Object.values(A).forEach((a) => { a.mesh = atom(g, a.p.toArray(), a.r, a.c, a.part, { roughness: .3, transparent: true }); });
+  const BONDS = [['c1', 'h1a'], ['c1', 'h1b'], ['c1', 'h1c'], ['c1', 'c2'], ['c2', 'h2a'], ['c2', 'h2b'], ['c2', 'o'], ['o', 'ho']];
+  const drawers = BONDS.map(([a, b]) => ({ a, b, draw: orderBond(g, 0x69736f, a === 'c2' && b === 'o' ? .05 : .038, 'Alpha cleavage') }));
   const lonePair = mechanismElectronArrow(g, 'Oxocarbenium');
 
-  // how far right each half reaches: the ion has to STOP at the detector, not fly through it
-  const edgeOf = (pts, r) => Math.max(...pts.map((p) => p.x)) + r;
-  const leftEdge = edgeOf([c1, ...c1H], .11);
-  const rightEdge = edgeOf([c2, o, oH, ...c2H], .23);
+  const ALL = Object.keys(A);
 
-  const neutralL = labelSprite('neutral · never detected', '#c98f8f', .58);
-  g.add(neutralL);
-  const caps = {
-    46: labelSprite('M⁺• survives whole · only 23% · the molecular ion is fragile', '#e7c96a', .88),
-    31: labelSprite('α-cleavage · the O lone pair makes C=O⁺ · BASE PEAK', '#8fd08a', .84),
-    45: labelSprite('M–H · loses one hydrogen · 42%', '#eda079', .5),
-    15: labelSprite('CH₃⁺ · nothing to stabilise the charge · only 8%', '#c98f8f', .8),
+  // Forming the C=O pi bond REHYBRIDISES the carbon: sp3 -> sp2. In ethanol the two CH2 hydrogens
+  // point out of the C-C-O plane, so drawn head-on one of them hides behind the carbon. The
+  // oxocarbenium is planar, and it has to be drawn that way or CH2=OH+ reads as CH=OH+.
+  const flat = (v) => V(v.x, v.y, 0);
+  const spin = (d, deg) => d.clone().applyAxisAngle(V(0, 0, 1), THREE.MathUtils.degToRad(deg));
+  const dirO = flat(A.o.p.clone().sub(A.c2.p)).normalize();
+  const dirC1 = flat(A.c1.p.clone().sub(A.c2.p)).normalize();
+  const dirOC = flat(A.c2.p.clone().sub(A.o.p)).normalize();
+  const LCH = A.c2.p.distanceTo(A.h2b.p);
+  const LOH = A.o.p.distanceTo(A.ho.p);
+  const hoFlat = [spin(dirOC, 120), spin(dirOC, -120)]
+    .map((d) => A.o.p.clone().addScaledVector(d, LOH))
+    .reduce((a, b) => (b.y > a.y ? b : a));                       // keep the O-H clear of the CH2
+  // CH2=OH+ : both hydrogens swing into the C=O plane, 120 deg either side of the oxygen
+  const SP2_31 = {
+    h2a: A.c2.p.clone().addScaledVector(spin(dirO, 120), LCH),
+    h2b: A.c2.p.clone().addScaledVector(spin(dirO, -120), LCH),
+    ho: hoFlat,
   };
-  Object.values(caps).forEach((c) => { c.position.set(.1, 2.0, 0); g.add(c); });
-  const frags = [
-    { p: 15 / 60, mz: 15, ion: 'left' },
-    { p: 31 / 60, mz: 31, ion: 'right' },
-    { p: 45 / 60, mz: 45, ion: 'both' },
-    { p: 46 / 60, mz: 46, ion: 'both' },
-  ];
+  // CH3-CH=OH+ : the one remaining hydrogen moves in-plane, opposite the O and the methyl
+  const SP2_45 = {
+    h2b: A.c2.p.clone().addScaledVector(dirO.clone().add(dirC1).negate().normalize(), LCH),
+    ho: hoFlat,
+  };
+  // CH3+ is a carbocation, so it is planar too -- the tripod flattens to trigonal 120 deg.
+  // Both cations in this spectrum are flat; the only difference is that one has a lone pair to lean on.
+  const LCH1 = A.c1.p.distanceTo(A.h1a.p);
+  const away = flat(A.c1.p.clone().sub(A.c2.p)).normalize();
+  const SP2_15 = {
+    h1a: A.c1.p.clone().addScaledVector(away, LCH1),
+    h1b: A.c1.p.clone().addScaledVector(spin(away, 120), LCH1),
+    h1c: A.c1.p.clone().addScaledVector(spin(away, -120), LCH1),
+  };
+
+  // Which atoms keep the charge, which bond breaks, and whether the O lone pair can form a C=O.
+  const FRAGS = [
+    { mz: 15, ion: ['c1', 'h1a', 'h1b', 'h1c'], cut: ['c1', 'c2'], oxo: false, rel: .08, sp2: SP2_15,
+      cap: 'CH₃⁺ · planar too, but no lone pair to lean on · 8%' },
+    { mz: 31, ion: ['c2', 'h2a', 'h2b', 'o', 'ho'], cut: ['c1', 'c2'], oxo: true, rel: 1, sp2: SP2_31,
+      cap: 'α-cleavage · the O lone pair makes C=O⁺ · BASE PEAK' },
+    { mz: 45, ion: ['c1', 'h1a', 'h1b', 'h1c', 'c2', 'h2b', 'o', 'ho'], cut: ['c2', 'h2a'], oxo: true, rel: .42, sp2: SP2_45,
+      cap: 'lose H• · an oxocarbenium again · 42%' },
+    { mz: 46, ion: ALL, cut: null, oxo: false, rel: .23,
+      cap: 'M⁺• intact · this mass IS the molecular mass · only 23%' },
+  ].map((f) => {
+    const set = new Set(f.ion);
+    const ions = f.ion.map((k) => A[k]);
+    const cy = ions.reduce((t, a) => t + a.p.y, 0) / ions.length;
+    const rightEdge = Math.max(...ions.map((a) => a.p.x + a.r));
+    // the ion is focused onto the flight axis, then accelerated to the detector face
+    return { ...f, set, p: f.mz / 60, off: V(DET_X - .14 - rightEdge, FLIGHT_Y - cy, 0) };
+  });
+
+  // --- the instrument: a tall source chamber, a narrow flight tube, a detector
+  const line = (w, h, x, y) => {
+    const m = new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.PlaneGeometry(w, h)),
+      new THREE.LineBasicMaterial({ color: 0x8a938f, transparent: true, opacity: .3 }));
+    m.position.set(x, y, 0); return m;
+  };
+  const srcBox = line(2.2, 2.5, -2.35, -1.8); tag(srcBox, 'Ionisation'); g.add(srcBox);
+  [.6, -.6].forEach((dy) => {                      // the flight tube: the ion travels INSIDE it
+    const rail = new THREE.Mesh(new THREE.CylinderGeometry(.012, .012, 3.25, 8), material(0x8a938f, { transparent: true, opacity: .32 }));
+    rail.rotation.z = Math.PI / 2; rail.position.set(.38, FLIGHT_Y + dy, 0); tag(rail, 'Analyser'); g.add(rail);
+  });
+  [-1.1, -.8].forEach((x, i) => {                  // accelerating plates, with a real aperture on the axis
+    [.95, -.95].forEach((dy) => {
+      const plate = new THREE.Mesh(new THREE.BoxGeometry(.05, .7, .9), material(0x9aa8a4, { metalness: .5, roughness: .35, transparent: true, opacity: .55 }));
+      plate.position.set(x, FLIGHT_Y + dy, 0); tag(plate, 'Analyser'); g.add(plate);
+    });
+    const sign = labelSprite(i === 0 ? '−' : '+', i === 0 ? '#8ea0e8' : '#eda079', .34); sign.visible = true;
+    sign.position.set(x, FLIGHT_Y + 1.55, 0); tag(sign, 'Analyser'); g.add(sign);
+  });
+  const detector = new THREE.Mesh(new THREE.BoxGeometry(.14, 1.6, 1.0), material(0x8a938f, { roughness: .4, metalness: .35 }));
+  detector.position.set(DET_X, FLIGHT_Y, 0); tag(detector, 'Detector'); g.add(detector);
+  const blip = new THREE.Mesh(new THREE.BoxGeometry(.05, 1.4, .04), material(0xe0ad35, { emissive: 0xe0ad35, emissiveIntensity: .9 }));
+  blip.position.set(DET_X - .1, FLIGHT_Y, .02); tag(blip, 'Detector'); g.add(blip);
+
+  const srcL = labelSprite('ion source · 70 eV e⁻', '#a9bcc4', .46); srcL.visible = true;
+  srcL.position.set(-2.35, -.32, 0); tag(srcL, 'Ionisation'); g.add(srcL);
+  const accL = labelSprite('accelerate', '#a9bcc4', .46); accL.visible = true;
+  accL.position.set(-.95, FLIGHT_Y + 2.1, 0); tag(accL, 'Analyser'); g.add(accL);
+  const detL = labelSprite('detector', '#c7d0cc', .46); detL.visible = true;
+  detL.position.set(DET_X, FLIGHT_Y - 1.05, 0); tag(detL, 'Detector'); g.add(detL);
+  const ionBeam = waveBeam(g, 0x5a6fd0, 'Ionisation');
+  const ejected = atom(g, [0, 0, 0], .08, 0x5a6fd0, 'Ionisation', { emissive: 0x5a6fd0, emissiveIntensity: .9 });
+
+  const neutralL = labelSprite('neutral · never detected', '#c98f8f', .42);
+  tag(neutralL, 'Neutral fragment'); g.add(neutralL);
+  const caps = {};
+  FRAGS.forEach((f) => {
+    const col = f.mz === 31 ? '#8fd08a' : f.mz === 46 ? '#e7c96a' : f.mz === 45 ? '#eda079' : '#c98f8f';
+    caps[f.mz] = labelSprite(f.cap, col, .62);
+    caps[f.mz].position.set(.3, 1.85, 0); g.add(caps[f.mz]);
+  });
 
   return (value, tt2) => {
-    let hit = null, amp = 0;
-    frags.forEach((f) => {
-      const a = Math.exp(-Math.pow((value - f.p) / .016, 2));
-      if (a > amp) { amp = a; hit = f; }
-    });
-    const on = !!hit && amp > .45;
-    Object.values(caps).forEach((c) => { c.visible = false; });
-    if (on) caps[hit.mz].visible = true;
+    const f = FRAGS.reduce((a, b) => (Math.abs(value - b.p) < Math.abs(value - a.p) ? b : a));
+    const amp = Math.exp(-Math.pow((value - f.p) / .018, 2));   // 1 on the peak, 0 between peaks
+    const hasNeutral = !!f.cut;
 
-    ionBeam(V(-3.15, -.35, 0), V(-2.5, -1.05, 0), .3, -tt2 * 9, .08, .95);
+    ionBeam(V(-3.42, -.72, 0), V(-2.78, -1.5, 0), .28, -tt2 * 9, .08, .95);
     const ejT = (tt2 * .6) % 1;
-    ejected.position.set(-1.75 + ejT * .7, -.75 + ejT * .8, 0);
+    ejected.position.set(-2.0 + ejT * .8, -1.2 + ejT * .9, 0);
     ejected.material.transparent = true; ejected.material.opacity = 1 - ejT;
 
-    const ionLeft = on && hit.ion === 'left';
-    const ionRight = on && hit.ion === 'right';
-    const both = on && hit.ion === 'both';
-    const broken = ionLeft || ionRight;
-
-    // the CHARGED half is pulled to the detector; the neutral half stays behind at the source
-    const edge = ionLeft ? leftEdge : rightEdge;
-    const travel = on ? amp * (DET_X - .12 - edge) : 0;
-    left.position.set(ionLeft || both ? travel : 0, 0, 0);
-    right.position.set(ionRight || both ? travel : 0, 0, 0);
-    const fade = (grp, isNeutral) => grp.traverse((ob) => {
-      if (!ob.material) return;
-      ob.material.transparent = true;
-      ob.material.opacity = isNeutral ? .25 : 1;
+    // the ion is pulled onto the axis and down the tube; the NEUTRAL is not accelerated at all,
+    // so it just drifts aside inside the source and is pumped away. It never crosses the beam.
+    const ionOff = f.off.clone().multiplyScalar(amp);
+    const neutralOff = V(-.25, -.55, 0).multiplyScalar(amp);
+    // as the pi bond forms, the carbon flattens: interpolate sp3 -> sp2 with the same amp
+    const at = (k) => {
+      const base = f.sp2?.[k] ? A[k].p.clone().lerp(f.sp2[k], amp) : A[k].p.clone();
+      return base.add(f.set.has(k) ? ionOff : neutralOff);
+    };
+    ALL.forEach((k) => {
+      const isIon = f.set.has(k);
+      A[k].mesh.position.copy(at(k));
+      A[k].mesh.material.opacity = isIon ? 1 : THREE.MathUtils.lerp(1, .2, amp);
     });
-    fade(left, broken && !ionLeft);
-    fade(right, broken && !ionRight);
 
-    ccBond(c1.clone().add(left.position), c2.clone().add(right.position), broken ? Math.max(0, 1 - amp * 2.6) : 1);
-    const oxo = ionRight ? amp : 0;
-    coBond(c2, o, 1 + oxo);                        // local frame: `right` supplies the translation
-    const cNow = c2.clone().add(right.position); const oNow = o.clone().add(right.position);
-    const arrowAmt = ionRight ? amp * (1 - THREE.MathUtils.smoothstep(amp, .45, .8)) : 0;
-    lonePair([oNow.clone().add(V(.25, .42, .2)), oNow.clone().lerp(cNow, .5).add(V(.04, .44, .2)), cNow.clone().add(V(.06, .24, .15))], arrowAmt * 2);
+    drawers.forEach(({ a, b, draw }) => {
+      const together = f.set.has(a) === f.set.has(b);
+      const isCO = a === 'c2' && b === 'o';
+      // the bond that has to break thins out and goes dashed as the fragments part
+      const order = together ? (isCO && f.oxo ? 1 + amp : 1) : Math.max(0, 1 - amp * 1.6);
+      draw(at(a), at(b), order);
+    });
 
-    const nGrp = ionLeft ? right : left;
-    const nAnchor = (ionLeft ? c2 : c1).clone().add(nGrp.position);
-    neutralL.visible = broken && amp > .5;
-    neutralL.position.copy(nAnchor).add(V(0, .68, 0));
-    ionL.visible = !broken;
+    // the lone pair swinging in, while the fragment is still in the source
+    const arrow = f.oxo ? amp * (1 - THREE.MathUtils.smoothstep(amp, .35, .75)) : 0;
+    const oNow = at('o'); const cNow = at('c2');
+    lonePair([oNow.clone().add(V(.22, .4, .2)), oNow.clone().lerp(cNow, .5).add(V(.04, .42, .2)), cNow.clone().add(V(.05, .22, .15))], arrow * 2);
 
-    blip.visible = on;
-    blip.material.emissiveIntensity = .3 + amp;
-    blip.scale.set(1, .35 + amp * .65, 1);
+    const neutralKeys = ALL.filter((k) => !f.set.has(k));
+    neutralL.visible = hasNeutral && amp > .5;
+    if (hasNeutral) {
+      const centre = neutralKeys.reduce((t, k) => t.add(at(k)), V(0, 0, 0)).multiplyScalar(1 / neutralKeys.length);
+      neutralL.position.set(Math.max(centre.x, -2.75), centre.y + .62, 0);
+    }
+    Object.values(caps).forEach((c) => { c.visible = false; });
+    if (amp > .5) caps[f.mz].visible = true;
+
+    // the detector strike is as bright as the peak is tall: m/z 15 barely registers, 31 saturates
+    blip.visible = amp > .05;
+    blip.material.emissiveIntensity = .2 + amp * f.rel;
+    blip.scale.set(1, .12 + amp * f.rel * .88, 1);
   };
 }
 
@@ -3278,7 +3317,7 @@ function analysisExhibit(progress, parameters = {}, step = 0, time = 0) {
   g.userData.update(progress, parameters, step, time);
   const scale = { ir: .8, raman: .66, uvvis: .62, nmr: .72, massspec: .62, xrd: .58, fluorescence: .62 }[id] || .75;
   g.scale.setScalar(scale);
-  const shift = { nmr: [-.85, 0], massspec: [-.65, .3], raman: [-.3, 0], ir: [-.2, 0], xrd: [-.7, .35] }[id] || [0, 0];
+  const shift = { nmr: [-.85, 0], massspec: [-.83, .34], raman: [-.3, 0], ir: [-.2, 0], xrd: [-.7, .35] }[id] || [0, 0];
   g.position.set(shift[0], shift[1], 0);
   if (TECHNIQUE_FLAT.has(id)) g.rotation.set(0, 0, 0);
   else g.rotation.set(.09, -.15, 0);

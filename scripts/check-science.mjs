@@ -61,6 +61,16 @@ const base = msSpec.peaks.reduce((a, b) => (b.h > a.h ? b : a));
 assert(base.label === '31', 'Ethanol base peak must be m/z 31.');
 assert(msSpec.peaks.find((p) => p.label === '46 M⁺•').h < base.h, 'The molecular ion must be weaker than the base peak.');
 assert(ms.parts.Oxocarbenium && ms.steps.some((st) => st[1].includes('lone pair')), 'Mass spec must explain alpha-cleavage and the oxocarbenium.');
+// Every fragment must be built from individual atoms, or m/z 45 (loss of H) cannot be drawn at all
+// and renders as the intact m/z 46 molecule. Each of the four guided steps must land on its own peak.
+assert(scene.includes("cut: ['c2', 'h2a']") && scene.includes("ion: ['c2', 'h2a', 'h2b', 'o', 'ho']") && scene.includes("ion: ['c1', 'h1a', 'h1b', 'h1c']"), 'Mass spec must fragment ethanol atom by atom: m/z 45 loses ONE hydrogen, not nothing.');
+assert(new Set(ms.guidedViews.map((v) => v.progress)).size === 4, 'Each mass-spec step must land on a different peak, or pressing Continue appears to do nothing.');
+// Forming the C=O pi bond rehybridises the carbon; a planar CH2=OH+ drawn sp3 hides a hydrogen.
+assert(scene.includes('const SP2_31 =') && scene.includes('const SP2_45 =') && scene.includes('const SP2_15 =') && scene.includes('f.sp2?.[k] ? A[k].p.clone().lerp(f.sp2[k], amp)'), 'Both cations must flatten sp3 -> sp2: the oxocarbenium as the C=O forms, and CH3+ because a carbocation is planar.');
+// The neutral is never accelerated: it must drift ASIDE, not fly down the beam through the ion.
+assert(scene.includes('const neutralOff = V(-.25, -.55, 0).multiplyScalar(amp);'), 'The neutral fragment must drift out of the ion beam rather than cross it.');
+// The detector strike must be as tall as the peak: m/z 15 (8%) cannot look like m/z 31 (100%).
+assert(scene.includes('blip.scale.set(1, .12 + amp * f.rel * .88, 1);'), 'Detector response must scale with the relative intensity of the selected ion.');
 
 // XRD: real Bragg angles from real NaCl + Cu K-alpha, and the two-plane model disclosed.
 const xrd = techniqueSpecs.find((t) => t.id === 'xrd');

@@ -319,29 +319,23 @@ export const techniqueSpecs = [
       Detector: 'Only ions of the selected mass-to-charge ratio get through and are counted.',
     },
     steps: [
-      ['Ionise: knock out one electron', 'A 70 eV electron does not add charge — it removes an electron, leaving a radical cation M⁺• at m/z 46. Its mass gives you the molecular mass straight away.'],
-      ['The molecular ion is fragile', 'M⁺• has an unpaired electron and a lot of excess energy, so most of it falls apart before it reaches the detector. That is why m/z 46 is only about a quarter of the tallest peak — the molecular ion is often weak, and sometimes absent altogether.'],
-      ['α-cleavage gives the base peak', 'The bond that breaks is the C–C next to oxygen. It leaves CH₂=OH⁺ at m/z 31, and oxygen immediately donates a lone pair to make a full C=O π bond. Sharing the charge over two atoms stabilises the cation enormously — which is why m/z 31 is the base peak.'],
-      ['Compare the alternative', 'Break the same bond the other way and you get CH₃⁺ at m/z 15: a bare primary carbocation with no lone pair to help it. It is worth only 8%. The spectrum is not a random shattering — it is a map of which cations are stable.'],
+      ['Ionise: knock ONE electron out', 'A 70 eV electron does not stick to ethanol — it knocks an electron OUT, leaving the radical cation M⁺• at m/z 46. That mass is the molecular mass, read straight off the axis. But watch how faintly the detector lights: M⁺• carries a lot of excess energy and most of it falls apart before it ever arrives. The molecular ion is only ~23% here, and for many molecules it is missing altogether.'],
+      ['α-cleavage gives the base peak', 'The bond that breaks is the C–C next to oxygen. It leaves CH₂=OH⁺ at m/z 31, and oxygen immediately donates a lone pair into the empty orbital to make a full C=O π bond, spreading the positive charge over two atoms. That stabilisation is why m/z 31 is the base peak. Now watch what is left in the source: •CH₃ is a neutral radical. It is never accelerated and never detected — it simply drifts aside and is pumped away.'],
+      ['Break the same bond the other way', 'Same bond, same two pieces — the only difference is which half keeps the charge. Leave it on the methyl and you get CH₃⁺ at m/z 15: a bare primary carbocation with no lone pair to help it, worth just 8%. The detector barely registers it. Fragmentation is not random shattering; it is a ranking of cation stability.'],
+      ['Lose a hydrogen instead', 'Drop an H from the carbon next to oxygen and you get CH₃–CH=OH⁺ at m/z 45 — an oxocarbenium again, so it is strong (42%). It still loses to m/z 31, and for a reason worth knowing: given the choice, the ion expels the more stable radical, and •CH₃ is more stable than H•. The two tallest peaks in this spectrum are both oxocarbenium ions.'],
     ],
     check: { q: 'Why is m/z 31 (CH₂=OH⁺) the base peak of ethanol rather than m/z 15 (CH₃⁺)?', options: ['It is heavier, so it hits the detector harder', 'Oxygen donates a lone pair to form a C=O π bond, spreading the positive charge over two atoms and stabilising the cation', 'It contains more hydrogens'], answer: 1, explanation: 'After α-cleavage the oxygen lone pair delocalises into the adjacent empty orbital, giving an oxocarbenium ion (CH₂=OH⁺) in which the charge is shared between C and O. CH₃⁺ has no such stabilisation, so it is a minor peak. Fragmentation follows cation stability.' },
     guidedViews: [
       { progress: msX(46), part: 'Molecular ion' },
-      { progress: msX(46), part: 'Molecular ion' },
       { progress: msX(31), part: 'Oxocarbenium' },
       { progress: msX(15), part: 'Methyl fragment' },
+      { progress: msX(45), part: 'Oxocarbenium' },
     ],
     observationPrompts: [
-      'At m/z 46 the intact radical cation gets through: that is the molecular mass.',
-      'Note it is only ~23% — the molecular ion is fragile.',
-      'At m/z 31 the oxocarbenium dominates. Watch the C=O π bond form.',
-      'At m/z 15 the bare methyl cation barely registers: 8%.',
-    ],
-    fragments: [
-      { p: msX(15), mz: 15, keep: ['ch3'], id: 'CH₃⁺', rel: 8 },
-      { p: msX(31), mz: 31, keep: ['ch2', 'oh'], id: 'CH₂=OH⁺ (base peak)', rel: 100 },
-      { p: msX(45), mz: 45, keep: ['ch3', 'ch2', 'oh'], id: 'M–H', rel: 42 },
-      { p: msX(46), mz: 46, keep: ['ch3', 'ch2', 'oh'], id: 'M⁺• molecular ion', rel: 23 },
+      'The whole molecule reaches the detector — but only faintly. m/z 46 is the molecular mass.',
+      'The C–C bond breaks, C=O forms, and •CH₃ is left behind. The detector saturates: this is the base peak.',
+      'Same break, charge on the other half. CH₃⁺ barely lights the detector at all.',
+      'One hydrogen leaves as H•. What flies is another oxocarbenium — strong, but still second.',
     ],
     readout: (progress) => {
       const mz = Math.round(progress * 60);
