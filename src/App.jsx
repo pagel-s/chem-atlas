@@ -349,9 +349,9 @@ export default function App() {
   return (
     <main className="app" style={{ '--accent': lesson.color }}>
       <header className="topbar">
-        <div className="brand" aria-label="Chemistry, in space">
+        <div className="brand" aria-label="Chemistry Atlas">
           <span className="brand-mark"><Atom size={19} strokeWidth={1.7} /></span>
-          <strong>Chemistry, in space</strong>
+          <strong>Chemistry Atlas</strong>
         </div>
         <div className="chapter-position">
           <span>Exhibit {lesson.number}</span>

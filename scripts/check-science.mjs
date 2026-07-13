@@ -82,6 +82,12 @@ const fluor = techniqueSpecs.find((t) => t.id === 'fluorescence');
 assert(fluor.steps[2][1].includes('upper vibrational level of S₀') || fluor.steps[2][1].includes('upper vibrational level of S0'), 'Fluorescence must emit into a vibrationally excited ground state.');
 assert(scene.includes('const topS0 = s0 + 2 * vib'), 'The Jablonski scene must land emission above the bottom of S0.');
 
+// A lone PAIR is two electrons. The old tangent (-y, x, 0) is the zero vector for a lobe pointing
+// along z (ammonia's), which stacked both dots on one point and drew ammonia as a radical.
+assert(scene.includes('crossVectors(direction, seed).normalize()') && !scene.includes('new THREE.Vector3(-direction.y, direction.x, 0)'), 'Lone-pair electrons must straddle the lobe axis for every orientation, or ammonia renders as a radical.');
+// Aromatic C-H must bisect the two ring bonds; pointing it out from the centroid is only right at the ends.
+assert(scene.includes('.negate().normalize();') && scene.includes('const LCH = a * .78;'), 'Anthracene C-H bonds must bisect the ring bonds, not radiate from the molecular centroid.');
+
 assert(new Set(lessons.map((lesson) => lesson.check.answer)).size >= 3, 'Knowledge-check answers must not share one position.');
 lessons.forEach((lesson) => {
   assert(lesson.steps.length === 4, `${lesson.id}: expected four authored investigation steps.`);

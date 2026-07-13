@@ -1450,7 +1450,11 @@ function geometry(progress) {
       const lobe = new THREE.Mesh(new THREE.SphereGeometry(.43, 36, 26), material(C.violet, { transparent: true, opacity: .48, side: THREE.DoubleSide, depthWrite: false }));
       lobe.scale.set(.65,.65,1.5); lobe.position.copy(direction).multiplyScalar(.92);
       lobe.quaternion.setFromUnitVectors(new THREE.Vector3(0,0,1),direction); tag(lobe,'Lone pair'); g.add(lobe);
-      const tangent = new THREE.Vector3(-direction.y, direction.x, 0).normalize().multiplyScalar(.1);
+      // The two dots must straddle the lobe axis. (-y, x, 0) collapses to the ZERO VECTOR when the
+      // lone pair points along z -- which is exactly ammonia's -- so both dots landed on the same
+      // point and the pair rendered as a single electron. Ammonia is not a radical.
+      const seed = Math.abs(direction.z) > .9 ? new THREE.Vector3(0, 1, 0) : new THREE.Vector3(0, 0, 1);
+      const tangent = new THREE.Vector3().crossVectors(direction, seed).normalize().multiplyScalar(.1);
       [-1,1].forEach((sign) => atom(g,direction.clone().multiplyScalar(1.36).add(tangent.clone().multiplyScalar(sign)).toArray(),.052,0xe4bb46,'Lone pair',{emissive:0xe4bb46,emissiveIntensity:.55}));
     });
     if (water) {
@@ -2794,12 +2798,19 @@ function anthracene(group, offset, part) {
     edges.add(ek);
     bond(group, p.clone().add(offset).toArray(), q.clone().add(offset).toArray(), .045, 0x69736f, part);
   }));
-  // hydrogens on every carbon that is not a ring-fusion carbon (fusion carbons have 3 C neighbours)
-  const neighbours = (p) => carbons.filter((q) => q !== p && p.distanceTo(q) < a * 1.15).length;
+  // Hydrogens go on every carbon that is not a ring fusion (fusion carbons have 3 C neighbours).
+  // The C-H must BISECT the two ring bonds, so all three angles at the carbon are 120 deg. Pointing
+  // it radially out from the molecular centroid -- as this used to -- is only right for the two
+  // carbons at the far ends; everywhere else it splays the hydrogen off at the wrong angle.
+  const neighboursOf = (p) => carbons.filter((q) => q !== p && p.distanceTo(q) < a * 1.15);
+  const LCH = a * .78;                              // C-H / C-C = 1.08 A / 1.39 A
   carbons.forEach((p) => {
-    if (neighbours(p) >= 3) return;
-    const outward = p.clone().normalize();
-    const hp = p.clone().addScaledVector(outward, .0).add(p.clone().sub(new THREE.Vector3(0, 0, 0)).normalize().multiplyScalar(.42));
+    const nb = neighboursOf(p);
+    if (nb.length >= 3) return;
+    const dir = nb
+      .reduce((acc, q) => acc.add(q.clone().sub(p).normalize()), new THREE.Vector3())
+      .negate().normalize();
+    const hp = p.clone().addScaledVector(dir, LCH);
     atom(group, hp.clone().add(offset).toArray(), .1, C.hydrogen, part, { roughness: .42 });
     bond(group, p.clone().add(offset).toArray(), hp.clone().add(offset).toArray(), .032, 0x767c79, part);
   });

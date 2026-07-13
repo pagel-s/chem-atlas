@@ -1,6 +1,6 @@
-# Chemistry, in space
+# Chemistry Atlas
 
-An interactive 3D chemistry atlas. Ten guided exhibits, each posing one question
+An interactive 3D chemistry atlas. Eleven guided exhibits, each posing one question
 and answering it with a single observable 3D scene — built as a mental-model aid
 for secondary-school through first-year undergraduate chemistry.
 
