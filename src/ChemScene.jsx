@@ -332,144 +332,85 @@ function smell(progress) {
 
 function sn2Mechanism(progress) {
   const g = new THREE.Group();
-  const carbon = [0, .35, 0];
-  atom(g, carbon, .26, C.carbon, 'Electrophile', { roughness: .28 });
-  const hydrogenAtoms = [];
-  const hydrogenBonds = [];
-  const createDynamicBond = (radius, color, part) => {
-    const mesh = new THREE.Mesh(new THREE.CylinderGeometry(radius, radius, 1, 14), material(color));
-    if (part) tag(mesh, part);
-    g.add(mesh);
-    return mesh;
-  };
-  const setDynamicBond = (mesh, a, b) => {
-    const startPoint = new THREE.Vector3(...a);
-    const endPoint = new THREE.Vector3(...b);
-    const direction = endPoint.clone().sub(startPoint);
-    mesh.position.copy(startPoint).add(endPoint).multiplyScalar(.5);
-    mesh.scale.set(1, direction.length(), 1);
-    mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), direction.normalize());
-  };
-  const substituents = [{ label: 'H', color: C.hydrogen, radius: .18 }, { label: 'D', color: 0x9fc9d2, radius: .18 }, { label: 'CH3', color: 0x4b5552, radius: .24 }];
-  for (let i = 0; i < 3; i += 1) {
-    const mesh = atom(g, [0,0,0], substituents[i].radius, substituents[i].color, undefined, { roughness: .34 });
-    const substituentLabel = labelSprite(substituents[i].label, '#f4f0e5', .14); substituentLabel.position.set(0, .32, 0); mesh.add(substituentLabel);
-    hydrogenAtoms.push(mesh);
-    hydrogenBonds.push(createDynamicBond(.06, 0x68716e));
-  }
-  const oxygenMesh = atom(g, [0,0,0], .3, C.oxygen, 'Nucleophile', { roughness: .28 });
-  const oxygenHydrogenMesh = atom(g, [0,0,0], .17, C.hydrogen, 'Nucleophile');
-  const oxygenHydrogenBond = createDynamicBond(.055, 0x69716e, 'Nucleophile');
-  const chlorineMesh = atom(g, [0,0,0], .36, C.chlorine, 'Leaving group', { roughness: .3 });
-  const incomingBond = createDynamicBond(.055, 0x69736f, 'Transition state');
-  const outgoingBond = createDynamicBond(.055, 0x69736f, 'Transition state');
-  incomingBond.material.transparent = true;
-  outgoingBond.material.transparent = true;
-  const incomingDashes = [];
-  const outgoingDashes = [];
-  for (let index = 0; index < 5; index += 1) {
-    incomingDashes.push(atom(g,[0,0,0],.047,0xd4ae45,'Transition state',{emissive:0x8d6817,emissiveIntensity:.3}));
-    outgoingDashes.push(atom(g,[0,0,0],.047,0xd4ae45,'Transition state',{emissive:0x8d6817,emissiveIntensity:.3}));
-  }
-  const lonePairs = [
-    atom(g,[0,0,0],.055,0xe9bd43,'Nucleophile',{emissive:0xe9bd43,emissiveIntensity:.7}),
-    atom(g,[0,0,0],.055,0xe9bd43,'Nucleophile',{emissive:0xe9bd43,emissiveIntensity:.7}),
-  ];
-  const electronPositions = new Float32Array(32 * 3);
-  const electronGeometry = new THREE.BufferGeometry();
-  electronGeometry.setAttribute('position', new THREE.BufferAttribute(electronPositions, 3));
-  const electronArrow = new THREE.Line(electronGeometry, new THREE.LineBasicMaterial({color:0xe0ad35}));
-  tag(electronArrow, 'Nucleophile'); g.add(electronArrow);
-  const electronHead = new THREE.Mesh(new THREE.ConeGeometry(.075,.2,16),material(0xe0ad35,{emissive:0x8a5d0d,emissiveIntensity:.25}));
-  tag(electronHead,'Nucleophile');g.add(electronHead);
-  const leavingElectronPositions = new Float32Array(30 * 3);
-  const leavingElectronGeometry = new THREE.BufferGeometry();
-  leavingElectronGeometry.setAttribute('position', new THREE.BufferAttribute(leavingElectronPositions, 3));
-  const leavingElectronArrow = new THREE.Line(leavingElectronGeometry, new THREE.LineBasicMaterial({ color: 0xe0ad35 }));
-  tag(leavingElectronArrow, 'Leaving group'); g.add(leavingElectronArrow);
-  const leavingElectronHead = new THREE.Mesh(new THREE.ConeGeometry(.075,.2,16),material(0xe0ad35,{emissive:0x8a5d0d,emissiveIntensity:.25}));
-  tag(leavingElectronHead,'Leaving group'); g.add(leavingElectronHead);
-  const nucleophileCharge = labelSprite('HO-', '#ffd36b', .2); oxygenMesh.add(nucleophileCharge); nucleophileCharge.position.set(0, .55, 0);
-  const leavingCharge = labelSprite('Cl-', '#ffd36b', .2); chlorineMesh.add(leavingCharge); leavingCharge.position.set(0, .58, 0);
-  const transitionCharge = labelSprite('OVERALL CHARGE -1  |  PARTIAL CHARGE SHARED', '#ffd36b', .42); transitionCharge.position.set(0, 1.85, 0); g.add(transitionCharge);
+  const V = (x, y, z) => new THREE.Vector3(x, y, z);
+  const C0 = V(0, .35, 0);                        // the electrophilic carbon
+  const AX = V(1, 0, 0);                          // Nu...C...Cl axis: hydroxide from -x, Cl leaves to +x
+  const LCH = 1.05, LCO = 1.36, LCCL = 1.34;
 
-  const energyPoints = [];
-  for (let i = 0; i <= 48; i += 1) {
-    const t = i / 48;
-    energyPoints.push(new THREE.Vector3(-2.7 + t * 5.4, -1.92 + Math.exp(-Math.pow((t - .5) / .2, 2)) * .92 - t * .28, -1.28));
-  }
-  const energyCurve = new THREE.CatmullRomCurve3(energyPoints);
-  const energyPath = new THREE.Mesh(new THREE.TubeGeometry(energyCurve, 96, .024, 8, false), material(0xa57a31, { emissive: 0x6f4c10, emissiveIntensity: .14 }));
-  tag(energyPath, 'Transition state'); g.add(energyPath);
-  const markerPosition = energyCurve.getPoint(progress);
-  const marker = atom(g, markerPosition.toArray(), .09, 0xe6b440, 'Transition state', { emissive: 0xe6b440, emissiveIntensity: .62 });
-  const energyLabel = labelSprite('ENERGY', '#e3bd58', .22); energyLabel.position.set(-2.85, -1.35, -1.28); g.add(energyLabel);
-  const coordinateLabel = labelSprite('REACTION COORDINATE', '#e3bd58', .34); coordinateLabel.position.set(0, -2.28, -1.28); g.add(coordinateLabel);
+  // The umbrella. u = -1 is the reactant (substituents lean away from Cl), u = +1 the inverted
+  // product. cos(109.47 deg) = -1/3 exactly, so the axial component is u/3 and the tetrahedral
+  // angle is exact at both ends -- and the three substituents pass through a genuinely PLANAR
+  // arrangement at u = 0, which is the transition state.
+  const subDir = (i, u) => {
+    const th = i * Math.PI * 2 / 3 + Math.PI / 6;
+    const ax = u / 3;
+    const rad = Math.sqrt(1 - ax * ax);
+    return V(ax, Math.cos(th) * rad, Math.sin(th) * rad);
+  };
+
+  atom(g, C0.toArray(), .26, C.carbon, 'Electrophile', { roughness: .28 });
+  const subs = [
+    { text: 'H', color: C.hydrogen, radius: .18 },
+    { text: 'D', color: 0x9fc9d2, radius: .18 },
+    { text: 'CH₃', color: 0x4b5552, radius: .24 },
+  ].map((sub) => {
+    const mesh = atom(g, [0, 0, 0], sub.radius, sub.color, 'Electrophile', { roughness: .34 });
+    const label = labelSprite(sub.text, '#f4f0e5', .22);
+    label.visible = true;                         // these never rendered, so the inversion had nothing to follow
+    label.position.set(0, .38, 0); mesh.add(label);
+    return { mesh, bond: animatedMechanismBond(g, 0x68716e, .052, 'Electrophile') };
+  });
+
+  const oMesh = atom(g, [0, 0, 0], .28, C.oxygen, 'Nucleophile', { roughness: .28 });
+  const ohMesh = atom(g, [0, 0, 0], .15, C.hydrogen, 'Nucleophile', { roughness: .4 });
+  const clMesh = atom(g, [0, 0, 0], .34, C.chlorine, 'Leaving group', { roughness: .3 });
+  const ohBond = animatedMechanismBond(g, 0x69716e, .052, 'Nucleophile');
+  // Both partial bonds go through the SAME renderer as every other mechanism, so a bond that is
+  // half-formed is drawn dashed instead of as a solid cylinder at half opacity.
+  const formBond = animatedMechanismBond(g, 0x69736f, .058, 'Transition state');
+  const breakBond = animatedMechanismBond(g, 0x69736f, .058, 'Transition state');
+  const arrowNu = mechanismElectronArrow(g, 'Nucleophile');
+  const arrowLg = mechanismElectronArrow(g, 'Leaving group');
+  const nuLabel = labelSprite('HO⁻', '#ffd36b', .26); oMesh.add(nuLabel); nuLabel.position.set(-.12, .52, 0);
+  const lgLabel = labelSprite('Cl⁻', '#ffd36b', .26); clMesh.add(lgLabel); lgLabel.position.set(.14, .54, 0);
+  const setMarker = mechanismEnergyTrack(g, 'Transition state', (t) => Math.exp(-Math.pow((t - .5) / .2, 2)) * .92 - t * .28);
 
   g.userData.update = (value) => {
-    const inversion = THREE.MathUtils.lerp(-.44, .44, value);
-    hydrogenAtoms.forEach((mesh, index) => {
-      const angle = index * Math.PI * 2 / 3 + Math.PI / 6;
-      const position = [inversion, .35 + Math.cos(angle) * 1.02, Math.sin(angle) * 1.02];
-      mesh.position.set(...position);
-      setDynamicBond(hydrogenBonds[index], carbon, position);
+    const u = THREE.MathUtils.lerp(-1, 1, THREE.MathUtils.smoothstep(value, .12, .88));
+    const approach = THREE.MathUtils.smoothstep(value, 0, .58);
+    const depart = THREE.MathUtils.smoothstep(value, .42, 1);
+    const forming = THREE.MathUtils.smoothstep(value, .16, .9);
+    const breaking = 1 - THREE.MathUtils.smoothstep(value, .1, .84);
+
+    subs.forEach((sub, i) => {
+      const p = C0.clone().addScaledVector(subDir(i, u), LCH);
+      sub.mesh.position.copy(p);
+      sub.bond(C0, p, 1);
     });
-    const approach = THREE.MathUtils.smoothstep(value, 0, .55);
-    const departure = THREE.MathUtils.smoothstep(value, .45, 1);
-    const oxygen = [-2.55 + approach * 1.22, .35, 0];
-    const oxygenH = [oxygen[0] - .48, oxygen[1] + .62, 0];
-    const chlorine = [1.32 + departure * 1.23, .35, 0];
-    oxygenMesh.position.set(...oxygen);
-    oxygenHydrogenMesh.position.set(...oxygenH);
-    chlorineMesh.position.set(...chlorine);
-    setDynamicBond(oxygenHydrogenBond, oxygen, oxygenH);
-    setDynamicBond(incomingBond, oxygen, carbon);
-    setDynamicBond(outgoingBond, carbon, chlorine);
-    incomingBond.material.opacity = .18 + value * .72;
-    outgoingBond.material.opacity = .9 - value * .72;
-    const oxygenVector = new THREE.Vector3(...oxygen);
-    const carbonVector = new THREE.Vector3(...carbon);
-    const chlorineVector = new THREE.Vector3(...chlorine);
-    incomingDashes.forEach((mesh, index) => mesh.position.copy(oxygenVector).lerp(carbonVector,(index+.5)/5));
-    outgoingDashes.forEach((mesh, index) => mesh.position.copy(carbonVector).lerp(chlorineVector,(index+.5)/5));
-    lonePairs[0].position.set(oxygen[0]+.36,oxygen[1]-.22,.18);
-    lonePairs[1].position.set(oxygen[0]+.36,oxygen[1]-.22,-.18);
-    const curve = new THREE.CatmullRomCurve3([
-      new THREE.Vector3(oxygen[0]+.4,oxygen[1]+.2,.18),
-      new THREE.Vector3(oxygen[0]*.55,oxygen[1]+.72,.25),
-      new THREE.Vector3(-.12,carbon[1]+.35,.08),
-    ]);
-    for(let index=0;index<32;index+=1){
-      const point=curve.getPoint(index/31);
-      electronPositions[index*3]=point.x;electronPositions[index*3+1]=point.y;electronPositions[index*3+2]=point.z;
-    }
-    electronGeometry.attributes.position.needsUpdate=true;
-    const arrowPoint=curve.getPoint(1);
-    const arrowTangent=curve.getTangent(1).normalize();
-    electronHead.position.copy(arrowPoint);
-    electronHead.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),arrowTangent);
-    const leavingCurve = new THREE.CatmullRomCurve3([
-      carbonVector.clone().lerp(chlorineVector, .48).add(new THREE.Vector3(0,.08,-.18)),
-      chlorineVector.clone().add(new THREE.Vector3(-.12,.55,-.22)),
-      chlorineVector.clone().add(new THREE.Vector3(.18,.38,-.08)),
-    ]);
-    for(let index=0;index<30;index+=1){
-      const point=leavingCurve.getPoint(index/29);
-      leavingElectronPositions[index*3]=point.x;leavingElectronPositions[index*3+1]=point.y;leavingElectronPositions[index*3+2]=point.z;
-    }
-    leavingElectronGeometry.attributes.position.needsUpdate=true;
-    leavingElectronHead.position.copy(leavingCurve.getPoint(1));
-    leavingElectronHead.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),leavingCurve.getTangent(1).normalize());
-    nucleophileCharge.visible = value < .38;
-    transitionCharge.visible = false;
-    leavingCharge.visible = value > .62;
-    marker.position.copy(energyCurve.getPoint(value));
+
+    const oPos = V(-2.7, -.25, 0).lerp(C0.clone().addScaledVector(AX, -LCO), approach);
+    const clPos = C0.clone().addScaledVector(AX, LCCL).lerp(V(2.7, .35, 0), depart);
+    oMesh.position.copy(oPos);
+    clMesh.position.copy(clPos);
+    // the hydroxide's own H answers to the bond being formed, sitting ~109 deg off the O...C axis
+    const ohPos = bentSecond(oPos, C0.clone().sub(oPos), .92, 109.5, 0);
+    ohMesh.position.copy(ohPos);
+    ohBond(oPos, ohPos, 1);
+
+    formBond(oPos, C0, forming);
+    breakBond(C0, clPos, breaking);
+
+    const op = THREE.MathUtils.smoothstep(value, .1, .26) * (1 - THREE.MathUtils.smoothstep(value, .66, .84));
+    arrowNu([oPos.clone().add(V(.24, .34, .2)), oPos.clone().lerp(C0, .5).add(V(0, .62, .22)), C0.clone().add(V(-.3, .22, .18))], op);
+    arrowLg([C0.clone().lerp(clPos, .5).add(V(0, .3, .2)), clPos.clone().add(V(-.12, .64, .22)), clPos.clone().add(V(.18, .36, .18))], op);
+
+    nuLabel.visible = value < .42;
+    lgLabel.visible = value > .58;
+    setMarker(value);
   };
   g.userData.update(progress);
-
   g.scale.setScalar(.9); g.rotation.set(.08, -.28, -.04); return g;
 }
-
 // A bond that knows its own bond order. A full bond is a solid stick; a PARTIAL bond - one
 // being made or broken in a transition state - is drawn dashed, which is the convention
 // chemists actually use. The two crossfade, so a forming bond goes dashed -> solid smoothly.
@@ -907,15 +848,23 @@ function mechanismElectronArrow(group, part, color = 0xe0ad35, segments = 24) {
 
 // heightAt(t) returns the energy profile height; SN1 passes a two-barrier profile.
 function mechanismEnergyTrack(group, part, heightAt) {
-  const z = -1.75;
+  // The track sits in its own group, counter-rotated against the scene tilt so the profile is read
+  // face-on. Laid out in the tilted scene it projected as a diagonal squiggle running off the frame.
+  const holder = new THREE.Group();
+  holder.position.set(.05, -1.9, -1.15);
+  holder.rotation.set(-.08, .28, .04);
+  group.add(holder);
+  const SPAN = 3.9;
   const pts = [];
-  for (let i = 0; i <= 48; i += 1) { const t = i / 48; pts.push(new THREE.Vector3(-2.7 + t * 5.4, -2.5 + heightAt(t), z)); }
+  for (let i = 0; i <= 48; i += 1) { const t = i / 48; pts.push(new THREE.Vector3(-SPAN / 2 + t * SPAN, heightAt(t) * .72 - .42, 0)); }
   const curve = new THREE.CatmullRomCurve3(pts);
-  const path = new THREE.Mesh(new THREE.TubeGeometry(curve, 96, .024, 8, false), material(0xa57a31, { emissive: 0x6f4c10, emissiveIntensity: .14 }));
-  tag(path, part); group.add(path);
-  const marker = atom(group, curve.getPoint(0).toArray(), .09, 0xe6b440, part, { emissive: 0xe6b440, emissiveIntensity: .62 });
-  const eLabel = labelSprite('ENERGY', '#e3bd58', .22); eLabel.position.set(-2.85, -1.95, z); group.add(eLabel);
-  const cLabel = labelSprite('REACTION COORDINATE', '#e3bd58', .34); cLabel.position.set(0, -2.9, z); group.add(cLabel);
+  const path = new THREE.Mesh(new THREE.TubeGeometry(curve, 96, .022, 8, false), material(0xa57a31, { emissive: 0x6f4c10, emissiveIntensity: .14 }));
+  tag(path, part); holder.add(path);
+  const marker = atom(holder, curve.getPoint(0).toArray(), .085, 0xe6b440, part, { emissive: 0xe6b440, emissiveIntensity: .62 });
+  const eLabel = labelSprite('ENERGY', '#e3bd58', .3); eLabel.visible = true;
+  eLabel.position.set(-SPAN / 2 - .55, .05, 0); holder.add(eLabel);
+  const cLabel = labelSprite('REACTION COORDINATE', '#e3bd58', .3); cLabel.visible = true;
+  cLabel.position.set(.35, -1.12, 0); holder.add(cLabel);
   return (value) => marker.position.copy(curve.getPoint(THREE.MathUtils.clamp(value, 0, 1)));
 }
 

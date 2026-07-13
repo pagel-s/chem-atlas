@@ -96,6 +96,15 @@ lessons.forEach((lesson) => {
 });
 assert(mechanismSpecs.length === 7, 'Mechanism exhibit must offer seven mechanism views.');
 assert(new Set(mechanismSpecs.map((spec) => spec.id)).size === 7, 'Mechanism ids must be unique.');
+// SN2 predated the shared mechanism renderers and drew its partial bonds as solid cylinders at
+// reduced opacity, with five loose spheres faking the dashes. Every mechanism must go through the
+// same helpers, so a half-formed bond looks half-formed everywhere.
+assert(!scene.includes('const incomingDashes') && !scene.includes('createDynamicBond'), 'SN2 must not reintroduce its bespoke bond and dash renderers.');
+const sn2Body = scene.slice(scene.indexOf('function sn2Mechanism'), scene.indexOf('function mechanism('));
+['animatedMechanismBond', 'mechanismElectronArrow', 'mechanismEnergyTrack', 'bentSecond'].forEach((helper) => {
+  assert(sn2Body.includes(helper), `SN2 must use the shared ${helper} like every other mechanism.`);
+});
+assert(sn2Body.includes('const ax = u / 3;'), 'SN2 inversion must use the exact tetrahedral axial component (cos 109.47 = -1/3) and pass through a planar transition state.');
 ['sn2', 'suzuki', 'dielsAlder', 'e2', 'sn1', 'carbonyl', 'michael'].forEach((id) => {
   assert(mechanismSpecs.some((spec) => spec.id === id), `Required mechanism variant is missing: ${id}.`);
   assert(scene.includes(`parameters.mechanismId === '${id}'`) || id === 'sn2', `Mechanism scene dispatch missing for ${id}.`);
